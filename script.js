@@ -14,6 +14,12 @@ const CACHE_TTL_MS = 10 * 60 * 1000; // 10 phút
 
 const PLAYABLE_EXTENSIONS = ['.mp3', '.m4a', '.wav', '.ogg', '.flac'];
 
+// Thời gian "ân hạn" sau khi upload — Archive.org cần vài phút để đồng bộ
+// file giữa các server trước khi link tải trực tiếp ổn định. Trong khoảng
+// thời gian này, tập mới sẽ bị ẩn khỏi danh sách để tránh người dùng bấm
+// trúng và gặp lỗi 404 "giả".
+const UPLOAD_GRACE_PERIOD_MS = 15 * 60 * 1000; // 15 phút
+
 // Counter API (giữ nguyên logic view-counter cũ, đổi namespace theo site mới)
 const COUNTER_NAMESPACE = 'khanz094-audio-space';
 const COUNTER_API_BASE = 'https://api.counterapi.dev/v1';
@@ -198,8 +204,16 @@ function buildTagFilterChips() {
     });
 }
 
+function isStillProcessing(ep) {
+    if (!ep.date) return false; // Không rõ thời gian upload -> coi như đã sẵn sàng
+    return (Date.now() - ep.date) < UPLOAD_GRACE_PERIOD_MS;
+}
+
 function getFilteredSortedList() {
     let list = [...allEpisodes];
+
+    // Ẩn các tập vừa upload còn trong thời gian đồng bộ với Archive.org
+    list = list.filter(ep => !isStillProcessing(ep));
 
     // Tab: liked / playlist
     if (currentTab === 'liked') {
@@ -574,6 +588,17 @@ document.getElementById('progress-bar').addEventListener('input', (e) => {
 });
 
 audio.addEventListener('error', () => {
+    const currentEp = allEpisodes[currentTrackIndex];
+
+    // Trường hợp người dùng vào đúng lúc tập vừa upload còn đang đồng bộ
+    // (ví dụ qua link chia sẻ trực tiếp, bỏ qua danh sách đã lọc)
+    if (currentEp && isStillProcessing(currentEp)) {
+        showToast('Tập này vừa tải lên, đang được xử lý — vui lòng thử lại sau ít phút', 'fa-hourglass-half');
+        isPlaying = false;
+        updatePlayIcons();
+        return;
+    }
+
     const err = audio.error;
     let reason = 'Lỗi không xác định';
     if (err) {
@@ -908,6 +933,11 @@ async function init() {
         buildTagFilterChips();
         renderEpisodes();
         checkDeepLinkTrack();
+
+        const processingCount = allEpisodes.filter(isStillProcessing).length;
+        if (processingCount > 0) {
+            showToast(`${processingCount} tập mới đang được xử lý, sẽ xuất hiện sau ít phút`, 'fa-hourglass-half');
+        }
     } catch (err) {
         container.innerHTML = `<div class="loading-spinner"><i class="fa-solid fa-triangle-exclamation"></i> Lỗi kết nối Internet Archive: ${escapeHtml(err.message)}</div>`;
         console.error('fetchAudioFromArchive error:', err);
