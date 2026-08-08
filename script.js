@@ -573,6 +573,23 @@ document.getElementById('progress-bar').addEventListener('input', (e) => {
     }
 });
 
+audio.addEventListener('error', () => {
+    const err = audio.error;
+    let reason = 'Lỗi không xác định';
+    if (err) {
+        switch (err.code) {
+            case err.MEDIA_ERR_ABORTED: reason = 'Phát bị hủy'; break;
+            case err.MEDIA_ERR_NETWORK: reason = 'Lỗi mạng khi tải file audio'; break;
+            case err.MEDIA_ERR_DECODE: reason = 'File audio bị lỗi định dạng'; break;
+            case err.MEDIA_ERR_SRC_NOT_SUPPORTED: reason = 'Không thể truy cập file trên Internet Archive (kiểm tra CORS/định dạng)'; break;
+        }
+    }
+    console.error('Audio playback error:', reason, audio.src);
+    showToast(`Không phát được: ${reason}`, 'fa-triangle-exclamation');
+    isPlaying = false;
+    updatePlayIcons();
+});
+
 audio.addEventListener('ended', () => {
     saveToHistory(allEpisodes[currentTrackIndex], 0, true);
     if (isRepeat) {
