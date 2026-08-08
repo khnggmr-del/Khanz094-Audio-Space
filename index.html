@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Khanz094's Audio Space</title>
+
+    <!-- Favicon -->
+    <link rel="icon" href="favicon.ico" sizes="any">
+    <link rel="icon" href="favicon-512.png" type="image/png" sizes="512x512">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+
+    <!-- Open Graph (Facebook, Messenger, Zalo...) -->
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Khanz094 Audio Space">
+    <meta property="og:title" content="Khanz094 Audio Space - Podcast cá nhân">
+    <meta property="og:description" content="Không gian lưu trữ podcast, chia sẻ góc nhìn và truyền cảm hứng qua từng tập audio chất lượng cao.">
+    <!-- ⚠️ THAY link bên dưới bằng đúng địa chỉ web đã deploy của bạn, ví dụ: https://khnggmr-del.github.io/Khanz094-audio-web/ -->
+    <meta property="og:url" content="https://khnggmr-del.github.io/Khanz094-audio-web/">
+    <meta property="og:image" content="https://khnggmr-del.github.io/Khanz094-audio-web/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+
+    <!-- Twitter/X Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Khanz094 Audio Space - Podcast cá nhân">
+    <meta name="twitter:description" content="Không gian lưu trữ podcast, chia sẻ góc nhìn và truyền cảm hứng qua từng tập audio chất lượng cao.">
+    <meta name="twitter:image" content="https://khnggmr-del.github.io/Khanz094-audio-web/og-image.png">
+
+    <!-- Font & Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- Header / Navbar -->
+    <header class="navbar">
+        <div class="logo">
+            <div class="logo-icon"><i class="fa-solid fa-podcast"></i></div>
+            <span>Khanz094</span>
+        </div>
+        
+        <div class="actions">
+            <button id="random-episode-btn" class="theme-btn" title="Nghe ngẫu nhiên">
+                <i class="fa-solid fa-shuffle"></i>
+            </button>
+            <button id="theme-toggle" class="theme-btn" title="Đổi giao diện">
+                <i class="fa-solid fa-moon"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- Hero Section -->
+    <section id="home" class="hero">
+        <div class="hero-content">
+            <span class="badge"><i class="fa-solid fa-sparkles"></i> Official Audio Space</span>
+            <h1>Lắng nghe cảm xúc cùng <span class="gradient-text">Khanz094</span></h1>
+            <p>Không gian lưu trữ podcast, các bài nói chuyện, chia sẻ góc nhìn và truyền cảm hứng qua từng tập audio chất lượng cao.</p>
+        </div>
+    </section>
+
+    <!-- Navigation Tabs -->
+    <div class="tabs-container">
+        <button class="tab-btn active" data-tab="all">
+            <i class="fa-solid fa-compass"></i>
+            <span>Tất cả tập</span>
+        </button>
+        
+        <button class="tab-btn" data-tab="liked">
+            <i class="fa-solid fa-heart"></i>
+            <span>Đã thích</span>
+            <span class="tab-badge" id="like-count">0</span>
+        </button>
+        
+        <button class="tab-btn" data-tab="playlist">
+            <i class="fa-solid fa-list-check"></i>
+            <span>Danh sách phát</span>
+            <span class="tab-badge" id="playlist-count">0</span>
+        </button>
+    </div>
+
+    <!-- Podcast Section -->
+    <section id="episodes" class="episodes-container">
+        <div class="section-header">
+            <div>
+                <h2 id="tab-title"><i class="fa-solid fa-list-ul gradient-icon"></i> Tất Cả Tập Podcast</h2>
+                <p id="tab-desc">Tự động cập nhật & sắp xếp theo tập mới nhất</p>
+            </div>
+            
+            <div class="header-controls">
+                <!-- Sắp xếp -->
+                <select id="sort-select" class="sort-select" title="Sắp xếp">
+                    <option value="newest">Mới nhất</option>
+                    <option value="oldest">Cũ nhất</option>
+                    <option value="az">Tên A-Z</option>
+                </select>
+
+                <!-- Thanh tìm kiếm -->
+                <div class="search-box">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="text" id="search-input" placeholder="Tìm kiếm tập podcast...">
+                </div>
+            </div>
+        </div>
+
+        <!-- Chip lọc theo chủ đề -->
+        <div id="tag-filter-container" class="tag-filter-container hidden"></div>
+
+        <!-- LỊCH SỬ NGHE -->
+        <section id="history-section" class="history-container hidden">
+            <div class="section-header">
+                <h2><i class="fa-solid fa-clock-rotate-left"></i> Tiếp tục nghe & Lịch sử</h2>
+                <button id="clear-history-btn" class="clear-btn" title="Xóa lịch sử">
+                    <i class="fa-solid fa-trash-can"></i> Xóa lịch sử
+                </button>
+            </div>
+            <div id="history-list" class="history-grid"></div>
+        </section>
+        
+        <!-- Grid Danh sách tập -->
+        <div class="grid-container" id="podcast-list">
+            <div class="loading-spinner">
+                <i class="fa-solid fa-circle-notch fa-spin"></i> Đang kết nối dữ liệu audio...
+            </div>
+        </div>
+    </section>
+
+    <!-- FULL PLAYER VIEW -->
+    <div class="player-modal hidden" id="player-modal">
+        <div class="player-container">
+            <!-- Header Modal -->
+            <div class="player-header">
+                <button id="minimize-player-btn" class="icon-btn" title="Thu nhỏ"><i class="fa-solid fa-chevron-down"></i></button>
+                <div class="player-header-text">
+                    <span>ĐANG PHÁT PODCAST</span>
+                </div>
+                <button id="stop-player-btn" class="icon-btn close-x-btn" title="Đóng & Dừng phát hẳn"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <!-- Body Giao Diện Nghe -->
+            <div class="player-content">
+                <!-- Bìa Postcard -->
+                <div class="cover-box">
+                    <img id="player-cover" src="" alt="Podcast Cover">
+                    <div class="playing-badge" id="playing-badge">
+                        <i class="fa-solid fa-wave-square fa-beat"></i> Đang phát
+                    </div>
+                </div>
+
+                <!-- Thông tin bài & Nút Like/Playlist/Share -->
+                <div class="track-details">
+                    <div class="track-title-row">
+                        <div class="track-tag-group">
+                            <span id="player-tag" class="track-tag">Podcast</span>
+                            <!-- HIỂN THỊ LƯỢT NGHE CỦA TẬP TRONG PLAYER -->
+                            <span class="views-tag"><i class="fa-solid fa-headphones"></i> <span id="player-views-count">0</span> lượt nghe</span>
+                        </div>
+                        <div class="player-actions">
+                            <button id="player-share-btn" class="action-btn" title="Chia sẻ tập này"><i class="fa-solid fa-share-nodes"></i></button>
+                            <button id="player-like-btn" class="action-btn" title="Thích tập này"><i class="fa-regular fa-heart"></i></button>
+                            <button id="player-playlist-btn" class="action-btn" title="Thêm vào danh sách phát"><i class="fa-solid fa-plus"></i></button>
+                        </div>
+                    </div>
+                    <h2 id="player-title">Tên bài hát</h2>
+                    <p id="player-artist">Khanz094</p>
+                </div>
+
+                <!-- Thanh thời gian & Trình điều khiển -->
+                <div class="controls-wrapper">
+                    <audio id="main-audio" src="" crossorigin="anonymous"></audio>
+                    
+                    <div class="progress-container">
+                        <input type="range" id="progress-bar" value="0" min="0" max="100">
+                        <div class="time-display">
+                            <span id="current-time">00:00</span>
+                            <span id="duration-time">00:00</span>
+                        </div>
+                    </div>
+
+                    <!-- Nút phụ: Tốc độ phát & Hẹn giờ tắt -->
+                    <div class="extra-controls">
+                        <!-- Menu Tốc độ -->
+                        <div class="dropdown-wrapper">
+                            <button id="speed-btn" class="extra-btn" title="Đổi tốc độ phát">
+                                <i class="fa-solid fa-gauge-high"></i> <span id="speed-text">1x</span>
+                            </button>
+                            <div id="speed-menu" class="dropdown-menu hidden">
+                                <div class="menu-title">Tốc độ phát</div>
+                                <button class="menu-item" data-speed="0.75">0.75x</button>
+                                <button class="menu-item active" data-speed="1">1.0x (Chuẩn)</button>
+                                <button class="menu-item" data-speed="1.25">1.25x</button>
+                                <button class="menu-item" data-speed="1.5">1.5x</button>
+                                <button class="menu-item" data-speed="2">2.0x</button>
+                            </div>
+                        </div>
+
+                        <!-- Menu Hẹn giờ -->
+                        <div class="dropdown-wrapper">
+                            <button id="timer-btn" class="extra-btn" title="Hẹn giờ tắt">
+                                <i class="fa-solid fa-moon"></i> <span id="timer-text">Hẹn giờ</span>
+                            </button>
+                            <div id="timer-menu" class="dropdown-menu hidden">
+                                <div class="menu-title">Hẹn giờ tắt</div>
+                                <button class="menu-item" data-timer="off">Tắt hẹn giờ</button>
+                                <button class="menu-item" data-timer="10">10 phút</button>
+                                <button class="menu-item" data-timer="15">15 phút</button>
+                                <button class="menu-item" data-timer="30">30 phút</button>
+                                <button class="menu-item" data-timer="40">40 phút</button>
+                                <button class="menu-item" data-timer="50">50 phút</button>
+                                <button class="menu-item" data-timer="60">1 giờ</button>
+                                <button class="menu-item" data-timer="end_episode">Hết tập này</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Nút bấm điều khiển chính -->
+                    <div class="control-btns">
+                        <button id="repeat-btn" title="Bật/Tắt Lặp lại tập này"><i class="fa-solid fa-repeat"></i></button>
+                        <button id="prev-btn" title="Lùi 10s"><i class="fa-solid fa-rotate-left"></i></button>
+                        <button id="play-btn" class="main-play-btn"><i class="fa-solid fa-play"></i></button>
+                        <button id="next-btn" title="Tua 10s"><i class="fa-solid fa-rotate-right"></i></button>
+                        <button id="auto-next-btn" class="active-mode" title="Tự động phát tập tiếp theo"><i class="fa-solid fa-forward-step"></i></button>
+                    </div>
+
+                    <!-- Thanh Âm Lượng & Volume Booster -->
+                    <div class="volume-container">
+                        <button id="mute-btn"><i class="fa-solid fa-volume-high"></i></button>
+                        <input type="range" id="volume-bar" value="100" min="0" max="100">
+                    </div>
+                </div>
+
+                <!-- Bản chép lời -->
+                <div class="transcript-section">
+                    <div class="transcript-title">
+                        <i class="fa-solid fa-file-lines"></i>
+                        <h3>Bản chép lời (Transcript)</h3>
+                    </div>
+                    <div class="transcript-box" id="transcript-text">
+                        <div class="loading-spinner"><i class="fa-solid fa-circle-notch fa-spin"></i> Đang tải lời...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mini Bottom Bar -->
+    <div class="mini-player hidden" id="mini-player">
+        <div class="mini-info" id="expand-player-btn">
+            <img id="mini-cover" src="" alt="Cover">
+            <div class="mini-text">
+                <h4 id="mini-title">Tên bài</h4>
+                <p id="mini-artist">Khanz094</p>
+            </div>
+        </div>
+        <div class="mini-controls">
+            <button id="mini-play-btn"><i class="fa-solid fa-play"></i></button>
+            <button id="mini-close-btn" class="mini-x-btn" title="Hủy nghe / Tắt"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+    </div>
+
+    <!-- Toast Thông Báo -->
+    <div id="toast-notification" class="toast hidden">
+        <i class="fa-solid fa-circle-check"></i> <span id="toast-msg">Đã chép liên kết!</span>
+    </div>
+
+    <!-- FOOTER MEA CULPA & COPYRIGHT -->
+    <footer class="site-footer">
+        <div class="footer-container">
+            <div class="footer-badge">
+                <i class="fa-solid fa-heart-pulse"></i> Phi thương mại & Chia sẻ cộng đồng
+            </div>
+
+            <p class="copyright">
+                © 2026 <strong>Khanz094 Audio Space</strong>. All rights reserved.
+            </p>
+
+            <div class="disclaimer-card">
+                <h4><i class="fa-solid fa-shield-halved"></i> Thông Tin & Thông Điệp Bản Quyền</h4>
+                <p>
+                    Toàn bộ nội dung audio/podcast trên hệ thống được sưu tầm, tổng hợp từ nhiều nguồn đại chúng (YouTube, Facebook, Podcast platforms...). 
+                    Mục đích duy nhất của trang web là <strong>lưu trữ cá nhân và chia sẻ trải nghiệm lắng nghe phi thương mại</strong> cho cộng đồng, tuyệt đối không sử dụng cho bất kỳ mục đích kinh doanh hay trục lợi nào.
+                </p>
+                <p>
+                    Chúng tôi luôn trân trọng và nỗ lực ghi rõ nguồn/tác giả trong từng tập audio. Tuy nhiên, do quá trình tổng hợp thủ công khó tránh khỏi sơ suất, nếu có bất kỳ nội dung nào vi phạm bản quyền của bạn, xin hãy cho chúng tôi biết. 
+                    Chúng tôi xin nhận trách nhiệm, thành thật xin lỗi và <strong>cam kết sẽ gỡ bỏ ngay lập tức theo yêu cầu</strong>.
+                </p>
+                <div class="contact-note">
+                    <i class="fa-solid fa-envelope"></i> Liên hệ phản hồi/gỡ bỏ: <span>khnggmr@gamil.com</span>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- File Javascript chính -->
+    <script src="script.js"></script>
+</body>
+</html>
