@@ -75,9 +75,12 @@ function isPlayableFile(fileEntry) {
 }
 
 /**
- * Chuyển 1 phần tử "files" từ Archive.org thành object podcast nội bộ
+ * Chuyển 1 phần tử "files" từ Archive.org thành object podcast nội bộ.
+ * fileEntry: file GỐC (dùng để lấy title/tag/mtime).
+ * playableFileEntry: file THỰC SỰ sẽ dùng để phát (có thể là bản derivative
+ * mp3/ogg do Archive.org tự tạo, phát ổn định hơn file gốc .m4a).
  */
-function transformFileToEpisode(fileEntry, metadata, index) {
+function transformFileToEpisode(fileEntry, metadata, index, playableFileEntry, hasDerivative) {
     const rawName = fileEntry.name;
     const dotIndex = rawName.lastIndexOf('.');
     const nameClean = dotIndex > -1 ? rawName.slice(0, dotIndex) : rawName;
@@ -104,10 +107,12 @@ function transformFileToEpisode(fileEntry, metadata, index) {
         title: title,
         tag: tag,
         cover: cover,
-        audioUrl: `${DOWNLOAD_BASE_URL}${ARCHIVE_ORG_IDENTIFIER}/${encodeURIComponent(rawName)}`,
+        audioUrl: `${DOWNLOAD_BASE_URL}${ARCHIVE_ORG_IDENTIFIER}/${encodeURIComponent(playableFileEntry.name)}`,
         originalIndex: index,
         date: dateSource || 0,
-        length: fileEntry.length ? Number(fileEntry.length) : null
+        length: fileEntry.length ? Number(fileEntry.length) : null,
+        hasDerivative: !!hasDerivative,
+        originalExt: (rawName.split('.').pop() || '').toLowerCase()
     };
 }
 
@@ -143,9 +148,25 @@ async function fetchAudioFromArchive() {
     const files = Array.isArray(json.files) ? json.files : [];
     const metadata = json.metadata || {};
 
-    const playableFiles = files.filter(isPlayableFile);
+    // File audio GỐC do người dùng upload (source: "original")
+    const originalAudioFiles = files.filter(f => isPlayableFile(f) && (f.source === 'original' || !f.source));
 
-    const episodes = playableFiles.map((fileEntry, idx) => transformFileToEpisode(fileEntry, metadata, idx));
+    // Bản derivative (Archive.org tự tạo, VD mp3/ogg) — thường phát ổn định hơn
+    // file gốc, đặc biệt với .m4a. Map theo tên file gốc (`original` field).
+    const derivativeMap = {};
+    files.filter(f => isPlayableFile(f) && f.source === 'derivative' && f.original).forEach(d => {
+        const existing = derivativeMap[d.original];
+        // Ưu tiên .mp3 nếu có nhiều derivative cho cùng 1 file gốc
+        if (!existing || d.name.toLowerCase().endsWith('.mp3')) {
+            derivativeMap[d.original] = d;
+        }
+    });
+
+    const episodes = originalAudioFiles.map((fileEntry, idx) => {
+        const derivative = derivativeMap[fileEntry.name];
+        const playableFileEntry = derivative || fileEntry;
+        return transformFileToEpisode(fileEntry, metadata, idx, playableFileEntry, !!derivative);
+    });
 
     // Loại trùng theo safeName
     const seen = new Set();
@@ -594,6 +615,15 @@ audio.addEventListener('error', () => {
     // (ví dụ qua link chia sẻ trực tiếp, bỏ qua danh sách đã lọc)
     if (currentEp && isStillProcessing(currentEp)) {
         showToast('Tập này vừa tải lên, đang được xử lý — vui lòng thử lại sau ít phút', 'fa-hourglass-half');
+        isPlaying = false;
+        updatePlayIcons();
+        return;
+    }
+
+    // Trường hợp file gốc chưa có bản derivative streaming-friendly
+    // (thường gặp với .m4a vừa upload — Archive.org cần thời gian xử lý riêng)
+    if (currentEp && !currentEp.hasDerivative && currentEp.originalExt !== 'mp3') {
+        showToast('File đang được Archive.org xử lý để phát trực tuyến, vui lòng thử lại sau', 'fa-hourglass-half');
         isPlaying = false;
         updatePlayIcons();
         return;
