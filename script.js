@@ -412,7 +412,7 @@ function togglePlaylist(safeName) {
 }
 
 function updatePlayerActionStates() {
-    const ep = currentList[currentTrackIndex] || allEpisodes.find(e => e.originalIndex === currentTrackIndex);
+    const ep = allEpisodes[currentTrackIndex];
     if (!ep) return;
     const liked = getLiked();
     const playlist = getPlaylist();
@@ -445,7 +445,6 @@ function showToast(message, icon = 'fa-circle-check') {
 
 /* ================= 9. VIEW COUNTER (Counter API) ================= */
 async function bumpAndGetViews(safeName) {
-    const key = `${COUNTER_NAMESPACE}-${safeName}`;
     try {
         const res = await fetch(`${COUNTER_API_BASE}/${COUNTER_NAMESPACE}/${safeName}/up`);
         if (res.ok) {
@@ -516,7 +515,7 @@ function playEpisodeByAllIndex(allIndex) {
     updatePlayerActionStates();
     loadTranscript(ep.filename);
     setupMediaSession(ep);
-    saveToHistory(ep, 0);
+    saveToHistory(ep, resumeTime);
 
     document.getElementById('player-views-count').textContent = '...';
     bumpAndGetViews(ep.safeName).then(count => {
@@ -593,9 +592,13 @@ function stopPlayer() {
 
 /* ================= 13. PROGRESS / TIME ================= */
 function formatTime(sec) {
-    if (!isFinite(sec) || isNaN(sec)) return '00:00';
-    const m = Math.floor(sec / 60);
+    if (!isFinite(sec) || isNaN(sec) || sec < 0) return '00:00';
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
     const s = Math.floor(sec % 60);
+    if (h > 0) {
+        return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    }
     return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
@@ -669,18 +672,46 @@ audio.addEventListener('ended', () => {
     }
 });
 
-/* Lưu vị trí nghe định kỳ */
+/* Lưu vị trí nghe định kỳ (backup, phòng khi các sự kiện dưới không kịp bắt) */
 let saveHistoryInterval = setInterval(() => {
     if (isPlaying && currentTrackIndex > -1 && audio.currentTime > 3) {
         saveToHistory(allEpisodes[currentTrackIndex], audio.currentTime);
     }
 }, 5000);
 
+/* Lưu vị trí NGAY khi tạm dừng — không cần chờ tick 5 giây tiếp theo */
+audio.addEventListener('pause', () => {
+    if (currentTrackIndex > -1 && audio.currentTime > 3 && !audio.ended) {
+        saveToHistory(allEpisodes[currentTrackIndex], audio.currentTime);
+    }
+});
+
+/* Lưu vị trí NGAY khi người dùng chuyển app / tắt màn hình / ẩn tab
+   (mobile hay throttle setInterval khi chạy nền, dễ mất tiến trình nếu
+   chỉ dựa vào interval) */
+function forceSaveCurrentProgress() {
+    if (currentTrackIndex > -1 && audio.currentTime > 3 && !audio.ended) {
+        saveToHistory(allEpisodes[currentTrackIndex], audio.currentTime);
+    }
+}
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') forceSaveCurrentProgress();
+});
+window.addEventListener('pagehide', forceSaveCurrentProgress);
+window.addEventListener('beforeunload', forceSaveCurrentProgress);
+
 /* ================= 14. HISTORY ================= */
 function saveToHistory(ep, position, completed = false) {
     if (!ep) return;
     let history = getHistory();
     const now = Date.now();
+
+    // audio.duration chỉ đáng tin khi đúng là bài đang phát VÀ đã load xong
+    // metadata; nếu không, dùng "length" lấy sẵn từ Archive.org làm dự phòng
+    // (tránh lưu 0/NaN vào lịch sử ngay lúc mới bắt đầu phát).
+    const isCurrentTrack = allEpisodes[currentTrackIndex] === ep;
+    const liveDuration = (isCurrentTrack && isFinite(audio.duration) && audio.duration > 0) ? audio.duration : 0;
+    const duration = liveDuration || ep.length || 0;
 
     history = history.filter(h => now - h.timestamp < HISTORY_TTL_MS);
     history = history.filter(h => h.safeName !== ep.safeName);
@@ -690,7 +721,7 @@ function saveToHistory(ep, position, completed = false) {
         title: ep.title,
         cover: ep.cover,
         position: completed ? 0 : position,
-        duration: audio.duration || 0,
+        duration: duration,
         timestamp: now
     });
 
@@ -825,7 +856,6 @@ document.getElementById('auto-next-btn').addEventListener('click', () => {
 });
 
 let isMuted = false;
-let lastVolume = 100;
 document.getElementById('mute-btn').addEventListener('click', () => {
     isMuted = !isMuted;
     audio.muted = isMuted;
@@ -835,8 +865,7 @@ document.getElementById('mute-btn').addEventListener('click', () => {
 
 document.getElementById('volume-bar').addEventListener('input', (e) => {
     const val = parseInt(e.target.value, 10);
-    audio.volume = Math.min(val, 100) / 100;
-    // Volume booster: cho phép tăng cảm giác to hơn qua GainNode nếu > 100 (giữ đơn giản, ổn định)
+    audio.volume = Math.min(Math.max(val, 0), 100) / 100;
     isMuted = val === 0;
     audio.muted = isMuted;
     const icon = document.querySelector('#mute-btn i');
