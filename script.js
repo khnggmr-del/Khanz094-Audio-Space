@@ -90,7 +90,9 @@ function transformFileToEpisode(fileEntry, metadata, index, playableFileEntry, h
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/(^-|-$)/g, '');
 
-    const title = fileEntry.title || metadata.title || nameClean;
+    // Ưu tiên: title riêng của file (nếu có) > tên file (đặc trưng cho từng tập)
+    // > tên chung của cả item (chỉ dùng khi không còn cách nào khác)
+    const title = fileEntry.title || nameClean || metadata.title;
 
     let tagSource = fileEntry.subject || metadata.subject || metadata.genre || 'Podcast';
     let tag = Array.isArray(tagSource) ? tagSource[0] : String(tagSource).split(',')[0].trim();
