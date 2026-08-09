@@ -487,6 +487,10 @@ function playEpisodeByAllIndex(allIndex) {
     document.getElementById('mini-title').textContent = ep.title;
     document.getElementById('mini-artist').textContent = 'Khanz094';
 
+    const fallbackLink = document.getElementById('player-fallback-link');
+    fallbackLink.href = ep.audioUrl;
+    fallbackLink.style.display = 'none';
+
     audio.src = ep.audioUrl;
 
     // Resume playback nếu có lưu vị trí
@@ -620,15 +624,6 @@ audio.addEventListener('error', () => {
         return;
     }
 
-    // Trường hợp file gốc chưa có bản derivative streaming-friendly
-    // (thường gặp với .m4a vừa upload — Archive.org cần thời gian xử lý riêng)
-    if (currentEp && !currentEp.hasDerivative && currentEp.originalExt !== 'mp3') {
-        showToast('File đang được Archive.org xử lý để phát trực tuyến, vui lòng thử lại sau', 'fa-hourglass-half');
-        isPlaying = false;
-        updatePlayIcons();
-        return;
-    }
-
     const err = audio.error;
     let reason = 'Lỗi không xác định';
     if (err) {
@@ -636,14 +631,20 @@ audio.addEventListener('error', () => {
             case err.MEDIA_ERR_ABORTED: reason = 'Phát bị hủy'; break;
             case err.MEDIA_ERR_NETWORK: reason = 'Lỗi mạng khi tải file audio'; break;
             case err.MEDIA_ERR_DECODE: reason = 'File audio bị lỗi định dạng'; break;
-            case err.MEDIA_ERR_SRC_NOT_SUPPORTED: reason = 'Không thể truy cập file trên Internet Archive (kiểm tra CORS/định dạng)'; break;
+            case err.MEDIA_ERR_SRC_NOT_SUPPORTED: reason = 'Trình duyệt không phát được file này qua đường dẫn hiện tại'; break;
         }
     }
     console.error('Audio playback error:', reason, audio.src);
-    showToast(`Không phát được: ${reason}`, 'fa-triangle-exclamation');
+    showToast(`Không phát được: ${reason}. Bạn có thể tải file trực tiếp bên dưới.`, 'fa-triangle-exclamation');
+
+    // Hiện link tải dự phòng để người dùng vẫn nghe được (tải về máy)
+    const fallbackLink = document.getElementById('player-fallback-link');
+    if (fallbackLink) fallbackLink.style.display = 'inline-flex';
+
     isPlaying = false;
     updatePlayIcons();
 });
+
 
 audio.addEventListener('ended', () => {
     saveToHistory(allEpisodes[currentTrackIndex], 0, true);
