@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Quản Trị — Khanz094 Audio Space</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<style>
+    :root {
+        --bg-color: #090d16;
+        --card-bg: #131b2e;
+        --card-hover: #1c2742;
+        --text-color: #f8fafc;
+        --text-muted: #94a3b8;
+        --primary: #6366f1;
+        --primary-gradient: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+        --border-color: rgba(255, 255, 255, 0.08);
+        --danger: #ef4444;
+        --success: #22c55e;
+    }
+    * { box-sizing: border-box; }
+    body {
+        margin: 0;
+        font-family: 'Segoe UI', Roboto, sans-serif;
+        background: var(--bg-color);
+        color: var(--text-color);
+        padding: 20px 16px 80px;
+    }
+    .wrap { max-width: 720px; margin: 0 auto; }
+    h1 { font-size: 1.4rem; display: flex; align-items: center; gap: 10px; }
+    h2 { font-size: 1.05rem; margin-top: 0; color: var(--text-color); }
+    .warn-banner {
+        background: rgba(239, 68, 68, 0.12);
+        border: 1px solid rgba(239, 68, 68, 0.4);
+        color: #fca5a5;
+        padding: 12px 14px;
+        border-radius: 10px;
+        font-size: 0.85rem;
+        margin-bottom: 20px;
+        line-height: 1.5;
+    }
+    section {
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 14px;
+        padding: 18px;
+        margin-bottom: 18px;
+    }
+    label {
+        display: block;
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        margin: 12px 0 6px;
+    }
+    input[type="text"], input[type="password"], textarea {
+        width: 100%;
+        padding: 10px 12px;
+        border-radius: 8px;
+        border: 1px solid var(--border-color);
+        background: #0c1220;
+        color: var(--text-color);
+        font-size: 0.9rem;
+        font-family: inherit;
+    }
+    textarea { resize: vertical; min-height: 60px; }
+    button {
+        cursor: pointer;
+        border: none;
+        border-radius: 8px;
+        padding: 11px 18px;
+        font-weight: 600;
+        font-size: 0.88rem;
+        margin-top: 14px;
+        margin-right: 8px;
+    }
+    .btn-primary { background: var(--primary-gradient); color: #fff; }
+    .btn-secondary { background: transparent; color: var(--text-muted); border: 1px solid var(--border-color); }
+    .btn-danger { background: transparent; color: var(--danger); border: 1px solid rgba(239,68,68,0.4); }
+    .status-msg { margin-top: 12px; font-size: 0.85rem; line-height: 1.5; }
+    .status-msg.error { color: #fca5a5; }
+    .status-msg.success { color: #86efac; }
+    .status-msg.loading { color: var(--text-muted); }
+    .hidden { display: none !important; }
+    .episode-card {
+        background: #0c1220;
+        border: 1px solid var(--border-color);
+        border-radius: 10px;
+        padding: 14px;
+        margin-bottom: 12px;
+    }
+    .episode-filename {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        word-break: break-all;
+        margin-bottom: 8px;
+        font-family: monospace;
+    }
+    #save-status { min-height: 20px; }
+    .save-bar {
+        position: sticky;
+        bottom: 0;
+        background: var(--bg-color);
+        padding: 12px 0 4px;
+        border-top: 1px solid var(--border-color);
+        margin-top: 20px;
+    }
+</style>
+</head>
+<body>
+<div class="wrap">
+    <h1><i class="fa-solid fa-user-shield"></i> Trang Quản Trị</h1>
+    <div class="warn-banner">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+        Trang này không dành cho người nghe thông thường. Không chia sẻ đường dẫn trang này hoặc Token GitHub cho bất kỳ ai — Token được lưu trong trình duyệt của chính máy bạn đang dùng.
+    </div>
+
+    <section id="config-section">
+        <h2><i class="fa-solid fa-plug"></i> 1. Kết nối GitHub</h2>
+        <label for="cfg-token">Personal Access Token (Fine-grained, quyền Contents: Read &amp; Write)</label>
+        <input type="password" id="cfg-token" placeholder="github_pat_...">
+
+        <label for="cfg-owner">Chủ tài khoản GitHub (username)</label>
+        <input type="text" id="cfg-owner" placeholder="vd: khnggmr-del">
+
+        <label for="cfg-repo">Tên repository</label>
+        <input type="text" id="cfg-repo" placeholder="vd: khnggmr-del.github.io">
+
+        <label for="cfg-branch">Nhánh (branch)</label>
+        <input type="text" id="cfg-branch" value="main">
+
+        <label for="cfg-archive-id">Archive.org identifier (item audio)</label>
+        <input type="text" id="cfg-archive-id" value="khanz094-audio-space">
+
+        <div>
+            <button class="btn-primary" id="btn-connect"><i class="fa-solid fa-arrows-rotate"></i> Kết nối &amp; Tải danh sách tập</button>
+            <button class="btn-danger" id="btn-clear-config"><i class="fa-solid fa-trash"></i> Xóa thông tin đã lưu trên máy này</button>
+        </div>
+        <div id="config-status" class="status-msg"></div>
+    </section>
+
+    <section id="episodes-section" class="hidden">
+        <h2><i class="fa-solid fa-list"></i> 2. Danh sách tập — sửa tên hiển thị</h2>
+        <p style="color:var(--text-muted); font-size:0.85rem; margin-top:-8px;">
+            Để trống ô nào thì web sẽ tự dùng tên file gốc / mặc định cho ô đó.
+        </p>
+        <div id="episodes-list"></div>
+    </section>
+
+    <div class="save-bar hidden" id="save-bar">
+        <button class="btn-primary" id="btn-save-all"><i class="fa-solid fa-floppy-disk"></i> Lưu tất cả thay đổi lên GitHub</button>
+        <div id="save-status" class="status-msg"></div>
+    </div>
+</div>
+
+<script>
+const LS_KEYS = {
+    token: 'khanz094_admin_token',
+    owner: 'khanz094_admin_owner',
+    repo: 'khanz094_admin_repo',
+    branch: 'khanz094_admin_branch',
+    archiveId: 'khanz094_admin_archive_id'
+};
+const OVERRIDES_PATH = 'metadata-overrides.json';
+const PLAYABLE_EXTENSIONS = ['.mp3', '.m4a', '.wav', '.ogg', '.flac'];
+
+let currentOverrides = {};
+let currentSha = null; // sha của file metadata-overrides.json hiện tại trên GitHub (null nếu file chưa tồn tại)
+let currentEpisodeFiles = []; // danh sách file gốc lấy từ Archive.org
+let cfg = {};
+
+function $(id) { return document.getElementById(id); }
+
+function loadSavedConfig() {
+    $('cfg-token').value = localStorage.getItem(LS_KEYS.token) || '';
+    $('cfg-owner').value = localStorage.getItem(LS_KEYS.owner) || '';
+    $('cfg-repo').value = localStorage.getItem(LS_KEYS.repo) || '';
+    $('cfg-branch').value = localStorage.getItem(LS_KEYS.branch) || 'main';
+    $('cfg-archive-id').value = localStorage.getItem(LS_KEYS.archiveId) || 'khanz094-audio-space';
+}
+
+function saveConfigToLocalStorage() {
+    localStorage.setItem(LS_KEYS.token, cfg.token);
+    localStorage.setItem(LS_KEYS.owner, cfg.owner);
+    localStorage.setItem(LS_KEYS.repo, cfg.repo);
+    localStorage.setItem(LS_KEYS.branch, cfg.branch);
+    localStorage.setItem(LS_KEYS.archiveId, cfg.archiveId);
+}
+
+function readConfigFromForm() {
+    return {
+        token: $('cfg-token').value.trim(),
+        owner: $('cfg-owner').value.trim(),
+        repo: $('cfg-repo').value.trim(),
+        branch: $('cfg-branch').value.trim() || 'main',
+        archiveId: $('cfg-archive-id').value.trim()
+    };
+}
+
+function setConfigStatus(msg, type) {
+    const el = $('config-status');
+    el.textContent = msg;
+    el.className = 'status-msg' + (type ? ' ' + type : '');
+}
+
+function setSaveStatus(msg, type) {
+    const el = $('save-status');
+    el.textContent = msg;
+    el.className = 'status-msg' + (type ? ' ' + type : '');
+}
+
+/* ============== ARCHIVE.ORG: lấy danh sách file gốc ============== */
+function isPlayableFile(fileEntry) {
+    const name = (fileEntry.name || '').toLowerCase();
+    return PLAYABLE_EXTENSIONS.some(ext => name.endsWith(ext));
+}
+
+async function fetchArchiveFiles(identifier) {
+    const res = await fetch(`https://archive.org/metadata/${encodeURIComponent(identifier)}`);
+    if (!res.ok) throw new Error(`Không thể kết nối Internet Archive (HTTP ${res.status})`);
+    const json = await res.json();
+    const files = Array.isArray(json.files) ? json.files : [];
+    return files.filter(f => isPlayableFile(f) && (f.source === 'original' || !f.source));
+}
+
+/* ============== GITHUB API ============== */
+function githubHeaders() {
+    return {
+        'Authorization': `Bearer ${cfg.token}`,
+        'Accept': 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28'
+    };
+}
+
+async function fetchOverridesFromGitHub() {
+    const url = `https://api.github.com/repos/${cfg.owner}/${cfg.repo}/contents/${OVERRIDES_PATH}?ref=${encodeURIComponent(cfg.branch)}`;
+    const res = await fetch(url, { headers: githubHeaders() });
+
+    if (res.status === 404) {
+        currentSha = null;
+        return {};
+    }
+    if (res.status === 401) throw new Error('Token không hợp lệ hoặc đã hết hạn.');
+    if (res.status === 403) throw new Error('Token không đủ quyền (cần quyền Contents: Read & Write) hoặc đã đạt giới hạn API.');
+    if (!res.ok) throw new Error(`Lỗi GitHub API (HTTP ${res.status})`);
+
+    const json = await res.json();
+    currentSha = json.sha;
+    try {
+        const decoded = decodeURIComponent(escape(atob(json.content.replace(/\n/g, ''))));
+        const parsed = JSON.parse(decoded);
+        return (parsed && typeof parsed === 'object') ? parsed : {};
+    } catch (e) {
+        throw new Error('File metadata-overrides.json trên GitHub bị lỗi định dạng JSON.');
+    }
+}
+
+async function saveOverridesToGitHub(overridesObj) {
+    const url = `https://api.github.com/repos/${cfg.owner}/${cfg.repo}/contents/${OVERRIDES_PATH}`;
+    const jsonStr = JSON.stringify(overridesObj, null, 2);
+    const base64Content = btoa(unescape(encodeURIComponent(jsonStr)));
+
+    const body = {
+        message: 'Cập nhật tên/mô tả tập qua trang admin',
+        content: base64Content,
+        branch: cfg.branch
+    };
+    if (currentSha) body.sha = currentSha;
+
+    const res = await fetch(url, {
+        method: 'PUT',
+        headers: { ...githubHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+    });
+
+    if (res.status === 401) throw new Error('Token không hợp lệ hoặc đã hết hạn.');
+    if (res.status === 403) throw new Error('Token không đủ quyền ghi (cần Contents: Read & Write).');
+    if (res.status === 409) throw new Error('File vừa bị thay đổi ở nơi khác. Hãy bấm "Kết nối & Tải danh sách tập" lại rồi thử lưu lại.');
+    if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.message || `Lỗi khi lưu lên GitHub (HTTP ${res.status})`);
+    }
+
+    const json = await res.json();
+    currentSha = json.content.sha;
+}
+
+/* ============== RENDER DANH SÁCH TẬP ============== */
+function escapeHtml(str) {
+    if (!str) return '';
+    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function renderEpisodesList() {
+    const container = $('episodes-list');
+    container.innerHTML = currentEpisodeFiles.map((f) => {
+        const override = currentOverrides[f.name] || {};
+        return `
+        <div class="episode-card" data-filename="${escapeHtml(f.name)}">
+            <div class="episode-filename"><i class="fa-solid fa-file-audio"></i> ${escapeHtml(f.name)}</div>
+            <label>Tên hiển thị</label>
+            <input type="text" class="ep-title" placeholder="${escapeHtml(f.name)}" value="${escapeHtml(override.title || '')}">
+            <label>Chủ đề / tag</label>
+            <input type="text" class="ep-tag" placeholder="Podcast" value="${escapeHtml(override.tag || '')}">
+            <label>Mô tả (hiện trong player)</label>
+            <textarea class="ep-desc" placeholder="Không bắt buộc">${escapeHtml(override.description || '')}</textarea>
+        </div>`;
+    }).join('');
+
+    $('episodes-section').classList.remove('hidden');
+    $('save-bar').classList.remove('hidden');
+}
+
+function collectOverridesFromForm() {
+    const result = {};
+    document.querySelectorAll('.episode-card').forEach(card => {
+        const filename = card.getAttribute('data-filename');
+        const title = card.querySelector('.ep-title').value.trim();
+        const tag = card.querySelector('.ep-tag').value.trim();
+        const description = card.querySelector('.ep-desc').value.trim();
+        if (title || tag || description) {
+            result[filename] = {};
+            if (title) result[filename].title = title;
+            if (tag) result[filename].tag = tag;
+            if (description) result[filename].description = description;
+        }
+    });
+    return result;
+}
+
+/* ============== SỰ KIỆN ============== */
+$('btn-connect').addEventListener('click', async () => {
+    cfg = readConfigFromForm();
+
+    if (!cfg.token || !cfg.owner || !cfg.repo || !cfg.archiveId) {
+        setConfigStatus('Vui lòng điền đủ Token, Owner, Repo và Archive.org identifier.', 'error');
+        return;
+    }
+
+    saveConfigToLocalStorage();
+    setConfigStatus('Đang tải danh sách tập từ Internet Archive...', 'loading');
+
+    try {
+        currentEpisodeFiles = await fetchArchiveFiles(cfg.archiveId);
+
+        if (currentEpisodeFiles.length === 0) {
+            setConfigStatus('Không tìm thấy file audio nào trên Archive.org với identifier này.', 'error');
+            return;
+        }
+
+        setConfigStatus('Đang tải file tên riêng hiện có từ GitHub...', 'loading');
+        currentOverrides = await fetchOverridesFromGitHub();
+
+        setConfigStatus(`Đã kết nối. Tìm thấy ${currentEpisodeFiles.length} tập.`, 'success');
+        renderEpisodesList();
+    } catch (err) {
+        setConfigStatus(err.message, 'error');
+        console.error(err);
+    }
+});
+
+$('btn-clear-config').addEventListener('click', () => {
+    if (!confirm('Xóa Token và thông tin đã lưu trên máy này? (Không ảnh hưởng gì trên GitHub, chỉ xóa khỏi trình duyệt)')) return;
+    Object.values(LS_KEYS).forEach(k => localStorage.removeItem(k));
+    $('cfg-token').value = '';
+    $('cfg-owner').value = '';
+    $('cfg-repo').value = '';
+    $('cfg-branch').value = 'main';
+    $('cfg-archive-id').value = 'khanz094-audio-space';
+    setConfigStatus('Đã xóa thông tin đã lưu.', 'success');
+});
+
+$('btn-save-all').addEventListener('click', async () => {
+    const btn = $('btn-save-all');
+    btn.disabled = true;
+    setSaveStatus('Đang lưu lên GitHub...', 'loading');
+
+    try {
+        const updatedOverrides = collectOverridesFromForm();
+        await saveOverridesToGitHub(updatedOverrides);
+        currentOverrides = updatedOverrides;
+        setSaveStatus('✅ Đã lưu thành công! Trang web chính sẽ hiện tên mới ngay lần tải sau.', 'success');
+    } catch (err) {
+        setSaveStatus('❌ ' + err.message, 'error');
+        console.error(err);
+    } finally {
+        btn.disabled = false;
+    }
+});
+
+loadSavedConfig();
+</script>
+</body>
+</html>
