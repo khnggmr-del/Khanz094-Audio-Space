@@ -665,6 +665,10 @@ document.getElementById('progress-bar').addEventListener('input', (e) => {
 });
 
 audio.addEventListener('error', () => {
+    // Bỏ qua lỗi giả khi chưa có tập nào được chọn phát — trình duyệt tự
+    // bắn sự kiện "error" ngay lúc tải trang vì thẻ audio có src rỗng ban đầu.
+    if (currentTrackIndex === -1 || !audio.src) return;
+
     const currentEp = allEpisodes[currentTrackIndex];
 
     // Trường hợp người dùng vào đúng lúc tập vừa upload còn đang đồng bộ
