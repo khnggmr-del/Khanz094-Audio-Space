@@ -30,6 +30,11 @@ const PLAYLIST_KEY = 'khanz094_playlist_v1';
 const HISTORY_LIMIT = 20;
 const HISTORY_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 ngày
 
+// File "sổ tay đặt tên riêng" — nằm cùng thư mục với index.html trên GitHub.
+// Trang admin (sau này) sẽ ghi vào đây; script.js chỉ đọc, không tự ghi.
+// Cấu trúc: { "<tên file gốc trên Archive.org>": { "title": "...", "tag": "...", "description": "..." } }
+const METADATA_OVERRIDES_URL = './metadata-overrides.json';
+
 /* ================= 2. STATE ================= */
 let allEpisodes = [];       // Toàn bộ tập, đã chuẩn hoá từ Archive.org
 let currentList = [];       // Danh sách đang hiển thị sau filter/sort/search
@@ -180,6 +185,44 @@ async function fetchAudioFromArchive() {
 
     writeCache(uniqueEpisodes);
     return uniqueEpisodes;
+}
+
+/**
+ * Đọc file "sổ tay đặt tên riêng" (metadata-overrides.json) — nếu chưa tồn tại
+ * hoặc lỗi mạng, coi như chưa có gì tùy chỉnh (trả về object rỗng), KHÔNG
+ * chặn web hoạt động bình thường.
+ * Luôn fetch mới (không cache), vì file này nhẹ và cần cập nhật ngay khi
+ * admin vừa sửa xong.
+ */
+async function loadMetadataOverrides() {
+    try {
+        const res = await fetch(`${METADATA_OVERRIDES_URL}?_=${Date.now()}`);
+        if (!res.ok) return {};
+        const data = await res.json();
+        return (data && typeof data === 'object') ? data : {};
+    } catch (e) {
+        return {};
+    }
+}
+
+/**
+ * Áp đè tên/tag/mô tả tùy chỉnh (nếu có) lên danh sách tập lấy từ Archive.org.
+ * Khớp theo `filename` (tên file gốc) — vì đó là thứ không đổi dù Archive.org
+ * có tạo thêm derivative hay không.
+ */
+function applyMetadataOverrides(episodes, overrides) {
+    if (!overrides || typeof overrides !== 'object') return episodes;
+    return episodes.map(ep => {
+        const override = overrides[ep.filename];
+        if (!override) return ep;
+        return {
+            ...ep,
+            title: override.title || ep.title,
+            tag: override.tag || ep.tag,
+            description: override.description || '',
+            cover: override.cover || ep.cover
+        };
+    });
 }
 
 /* ================= 5. RENDER: DANH SÁCH TẬP ================= */
@@ -456,10 +499,14 @@ async function bumpAndGetViews(safeName) {
     return null;
 }
 
-/* ================= 10. TRANSCRIPT (Archive.org chưa hỗ trợ) ================= */
-async function loadTranscript(filename) {
+/* ================= 10. MÔ TẢ / TRANSCRIPT ================= */
+async function loadTranscript(ep) {
     const box = document.getElementById('transcript-text');
-    box.innerHTML = `<div class="loading-spinner"><i class="fa-solid fa-circle-info"></i> 📝 Bản chép lời hiện chưa khả dụng trên nguồn Internet Archive.</div>`;
+    if (ep && ep.description) {
+        box.innerHTML = `<p style="white-space:pre-wrap;">${escapeHtml(ep.description)}</p>`;
+    } else {
+        box.innerHTML = `<div class="loading-spinner"><i class="fa-solid fa-circle-info"></i> 📝 Chưa có mô tả cho tập này.</div>`;
+    }
 }
 
 /* ================= 11. PLAYER CORE ================= */
@@ -513,7 +560,7 @@ function playEpisodeByAllIndex(allIndex) {
 
     openPlayerModal();
     updatePlayerActionStates();
-    loadTranscript(ep.filename);
+    loadTranscript(ep);
     setupMediaSession(ep);
     saveToHistory(ep, resumeTime);
 
@@ -985,7 +1032,11 @@ async function init() {
 
     const container = document.getElementById('podcast-list');
     try {
-        allEpisodes = await fetchAudioFromArchive();
+        const [rawEpisodes, overrides] = await Promise.all([
+            fetchAudioFromArchive(),
+            loadMetadataOverrides()
+        ]);
+        allEpisodes = applyMetadataOverrides(rawEpisodes, overrides);
 
         if (allEpisodes.length === 0) {
             container.innerHTML = `<div class="loading-spinner"><i class="fa-solid fa-triangle-exclamation"></i> Chưa có tập audio nào trên Internet Archive.</div>`;
