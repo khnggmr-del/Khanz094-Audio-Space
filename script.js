@@ -32,7 +32,7 @@ const HISTORY_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 ngày
 
 // File "sổ tay đặt tên riêng" — nằm cùng thư mục với index.html trên GitHub.
 // Trang admin (sau này) sẽ ghi vào đây; script.js chỉ đọc, không tự ghi.
-// Cấu trúc: { "<tên file gốc trên Archive.org>": { "title": "...", "tag": "...", "description": "..." } }
+// Cấu trúc: { "<tên file gốc trên Archive.org>": { "title": "...", "tags": ["...", "..."], "description": "..." } }
 const METADATA_OVERRIDES_URL = './metadata-overrides.json';
 
 /* ================= 2. STATE ================= */
@@ -100,8 +100,10 @@ function transformFileToEpisode(fileEntry, metadata, index, playableFileEntry, h
     const title = fileEntry.title || nameClean || metadata.title;
 
     let tagSource = fileEntry.subject || metadata.subject || metadata.genre || 'Podcast';
-    let tag = Array.isArray(tagSource) ? tagSource[0] : String(tagSource).split(',')[0].trim();
-    if (!tag) tag = 'Podcast';
+    let tags = Array.isArray(tagSource)
+        ? tagSource.map(t => String(t).trim()).filter(Boolean)
+        : String(tagSource).split(',').map(t => t.trim()).filter(Boolean);
+    if (tags.length === 0) tags = ['Podcast'];
 
     // Ảnh bìa: ưu tiên ảnh riêng của item trên Archive.org (dùng ảnh __ia_thumb.jpg mặc định)
     const cover = `https://archive.org/services/img/${ARCHIVE_ORG_IDENTIFIER}`;
@@ -112,7 +114,7 @@ function transformFileToEpisode(fileEntry, metadata, index, playableFileEntry, h
         filename: rawName,
         safeName: safeName || `episode-${index}`,
         title: title,
-        tag: tag,
+        tags: tags,
         cover: cover,
         audioUrl: `${DOWNLOAD_BASE_URL}${ARCHIVE_ORG_IDENTIFIER}/${encodeURIComponent(playableFileEntry.name)}`,
         originalIndex: index,
@@ -215,10 +217,19 @@ function applyMetadataOverrides(episodes, overrides) {
     return episodes.map(ep => {
         const override = overrides[ep.filename];
         if (!override) return ep;
+
+        // Ưu tiên "tags" (mảng, admin mới) > "tag" (chuỗi đơn, dữ liệu cũ) > tag gốc
+        let tags = ep.tags;
+        if (Array.isArray(override.tags) && override.tags.length > 0) {
+            tags = override.tags;
+        } else if (override.tag) {
+            tags = [override.tag];
+        }
+
         return {
             ...ep,
             title: override.title || ep.title,
-            tag: override.tag || ep.tag,
+            tags: tags,
             description: override.description || '',
             cover: override.cover || ep.cover
         };
@@ -242,11 +253,13 @@ function buildTagFilterChips() {
     // Giữ lại cách viết xuất hiện ĐẦU TIÊN làm nhãn hiển thị.
     const tagMap = new Map(); // key chuẩn hóa (lowercase, trim) -> nhãn hiển thị gốc
     allEpisodes.forEach(ep => {
-        if (!ep.tag) return;
-        const key = ep.tag.trim().toLowerCase();
-        if (key && !tagMap.has(key)) {
-            tagMap.set(key, ep.tag.trim());
-        }
+        (ep.tags || []).forEach(t => {
+            if (!t) return;
+            const key = t.trim().toLowerCase();
+            if (key && !tagMap.has(key)) {
+                tagMap.set(key, t.trim());
+            }
+        });
     });
 
     if (tagMap.size <= 1) {
@@ -303,7 +316,7 @@ function getFilteredSortedList() {
 
     // Tag filter (currentTagFilter là key đã chuẩn hóa: lowercase + trim)
     if (currentTagFilter) {
-        list = list.filter(ep => ep.tag && ep.tag.trim().toLowerCase() === currentTagFilter);
+        list = list.filter(ep => (ep.tags || []).some(t => t.trim().toLowerCase() === currentTagFilter));
     }
 
     // Search
@@ -312,7 +325,7 @@ function getFilteredSortedList() {
     if (query) {
         list = list.filter(ep =>
             ep.title.toLowerCase().includes(query) ||
-            (ep.tag && ep.tag.toLowerCase().includes(query))
+            (ep.tags || []).some(t => t.toLowerCase().includes(query))
         );
     }
 
@@ -366,7 +379,7 @@ function renderEpisodes({ resetPage = true } = {}) {
                 <button class="play-card-btn" title="Phát"><i class="fa-solid fa-play"></i></button>
             </div>
             <div class="card-body">
-                <span class="card-tag">${escapeHtml(ep.tag)}</span>
+                <span class="card-tags">${(ep.tags || []).map(t => `<span class="card-tag">${escapeHtml(t)}</span>`).join('')}</span>
                 <h3>${escapeHtml(ep.title)}</h3>
                 <p>${formatDate(ep.date) || 'Khanz094'}</p>
             </div>
@@ -558,7 +571,7 @@ function playEpisodeByAllIndex(allIndex) {
     document.getElementById('player-cover').src = ep.cover;
     document.getElementById('player-title').textContent = ep.title;
     document.getElementById('player-artist').textContent = 'Khanz094';
-    document.getElementById('player-tag').textContent = ep.tag;
+    document.getElementById('player-tag').textContent = (ep.tags || []).join(', ');
 
     document.getElementById('mini-cover').src = ep.cover;
     document.getElementById('mini-title').textContent = ep.title;
