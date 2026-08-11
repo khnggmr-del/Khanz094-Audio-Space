@@ -330,9 +330,13 @@ function getFilteredSortedList() {
     return list;
 }
 
-function renderEpisodes() {
+const EPISODES_PAGE_SIZE = 24;
+let visibleEpisodeCount = EPISODES_PAGE_SIZE;
+
+function renderEpisodes({ resetPage = true } = {}) {
     const container = document.getElementById('podcast-list');
     currentList = getFilteredSortedList();
+    if (resetPage) visibleEpisodeCount = EPISODES_PAGE_SIZE;
 
     if (currentList.length === 0) {
         container.innerHTML = `<div class="loading-spinner"><i class="fa-solid fa-circle-info"></i> Không tìm thấy tập podcast nào phù hợp.</div>`;
@@ -341,8 +345,10 @@ function renderEpisodes() {
 
     const liked = getLiked();
     const playlist = getPlaylist();
+    const visibleList = currentList.slice(0, visibleEpisodeCount);
+    const remaining = currentList.length - visibleList.length;
 
-    container.innerHTML = currentList.map(ep => {
+    const cardsHtml = visibleList.map(ep => {
         const isLiked = liked.includes(ep.safeName);
         const isInPlaylist = playlist.includes(ep.safeName);
         return `
@@ -367,6 +373,14 @@ function renderEpisodes() {
         </div>`;
     }).join('');
 
+    const loadMoreHtml = remaining > 0
+        ? `<button id="load-more-episodes-btn" class="tag-chip" style="width:100%; margin-top:8px; padding:14px; font-size:0.9rem;">
+               <i class="fa-solid fa-chevron-down"></i> Tải thêm (còn ${remaining} tập)
+           </button>`
+        : '';
+
+    container.innerHTML = cardsHtml + loadMoreHtml;
+
     // Gắn sự kiện cho từng card
     container.querySelectorAll('.podcast-card').forEach(card => {
         const safeName = card.getAttribute('data-safename');
@@ -388,6 +402,14 @@ function renderEpisodes() {
             togglePlaylist(safeName);
         });
     });
+
+    const loadMoreBtn = document.getElementById('load-more-episodes-btn');
+    if (loadMoreBtn) {
+        loadMoreBtn.addEventListener('click', () => {
+            visibleEpisodeCount += EPISODES_PAGE_SIZE;
+            renderEpisodes({ resetPage: false });
+        });
+    }
 }
 
 function escapeHtml(str) {
@@ -444,9 +466,7 @@ function toggleLike(safeName) {
         liked.push(safeName);
         showToast('Đã thêm vào Đã thích', 'fa-heart');
     }
-    setJSON(LIKED_KEY, liked);
-    updateTabBadges();
-    renderEpisodes();
+    renderEpisodes({ resetPage: false });
     if (currentTrackIndex > -1) updatePlayerActionStates();
 }
 
@@ -459,9 +479,7 @@ function togglePlaylist(safeName) {
         playlist.push(safeName);
         showToast('Đã thêm vào Danh sách phát', 'fa-list-check');
     }
-    setJSON(PLAYLIST_KEY, playlist);
-    updateTabBadges();
-    renderEpisodes();
+    renderEpisodes({ resetPage: false });
     if (currentTrackIndex > -1) updatePlayerActionStates();
 }
 
