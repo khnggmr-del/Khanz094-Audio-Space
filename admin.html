@@ -53,7 +53,7 @@
         color: var(--text-muted);
         margin: 12px 0 6px;
     }
-    input[type="text"], input[type="password"], textarea {
+    input[type="text"], input[type="password"], textarea, select {
         width: 100%;
         padding: 10px 12px;
         border-radius: 8px;
@@ -63,6 +63,7 @@
         font-size: 0.9rem;
         font-family: inherit;
     }
+    select { appearance: none; -webkit-appearance: none; }
     textarea { resize: vertical; min-height: 60px; }
     button {
         cursor: pointer;
@@ -118,7 +119,10 @@
     <section id="config-section">
         <h2><i class="fa-solid fa-plug"></i> 1. Kết nối GitHub</h2>
         <label for="cfg-token">Personal Access Token (Fine-grained, quyền Contents: Read &amp; Write)</label>
-        <input type="password" id="cfg-token" placeholder="github_pat_...">
+        <div style="position:relative;">
+            <input type="text" id="cfg-token" placeholder="github_pat_..." style="padding-right:44px;">
+            <button type="button" id="btn-toggle-token" class="btn-secondary" style="position:absolute; right:4px; top:50%; transform:translateY(-50%); margin:0; padding:6px 10px; font-size:0.9rem;"><i class="fa-solid fa-eye"></i></button>
+        </div>
 
         <label for="cfg-owner">Chủ tài khoản GitHub (username)</label>
         <input type="text" id="cfg-owner" placeholder="vd: khnggmr-del">
@@ -164,6 +168,21 @@ const LS_KEYS = {
 const OVERRIDES_PATH = 'metadata-overrides.json';
 const PLAYABLE_EXTENSIONS = ['.mp3', '.m4a', '.wav', '.ogg', '.flac'];
 
+// Danh sách chủ đề/tag phổ biến trong thị trường truyện audio — hiện dạng
+// dropdown để chọn, không cho gõ tay tự do (tránh tình trạng cùng 1 chủ đề
+// bị gõ khác nhau, VD "Ngôn tình" / "ngôn tình " thành 2 tag khác nhau).
+const TAG_OPTIONS = [
+    'Ngôn tình', 'Ngôn tình cổ trang', 'Đam mỹ', 'Bách hợp',
+    'Huyền huyễn', 'Tiên hiệp', 'Kiếm hiệp', 'Xuyên không', 'Trọng sinh',
+    'Dị giới', 'Đô thị', 'Khoa huyễn', 'Vô hạn lưu',
+    'Trinh thám', 'Kinh dị', 'Truyện ma', 'Tâm linh',
+    'Cung đấu', 'Trạch đấu', 'Quan trường', 'Dã sử', 'Cổ đại',
+    'Hài hước', 'Gia đình', 'Học đường', 'Thanh xuân vườn trường',
+    'Ngược tâm', 'Sủng', 'Điền văn', 'Nữ cường', 'Nam cường',
+    'Chữa lành', 'Tản văn', 'Truyền cảm hứng', 'Tâm sự',
+    'Drama', 'Podcast', 'Radio', 'Khác'
+];
+
 let currentOverrides = {};
 let currentSha = null; // sha của file metadata-overrides.json hiện tại trên GitHub (null nếu file chưa tồn tại)
 let currentEpisodeFiles = []; // danh sách file gốc lấy từ Archive.org
@@ -187,12 +206,19 @@ function saveConfigToLocalStorage() {
     localStorage.setItem(LS_KEYS.archiveId, cfg.archiveId);
 }
 
+function sanitizeAsciiField(str) {
+    // Header HTTP chỉ chấp nhận ký tự ISO-8859-1 (ASCII cơ bản) — lọc bỏ mọi
+    // ký tự ẩn/lạ có thể dính theo khi copy-paste trên điện thoại (khoảng
+    // trắng đặc biệt, ký tự vô hình, dấu ngoặc kép thông minh...).
+    return str.replace(/[^\x20-\x7E]/g, '').trim();
+}
+
 function readConfigFromForm() {
     return {
-        token: $('cfg-token').value.trim(),
-        owner: $('cfg-owner').value.trim(),
-        repo: $('cfg-repo').value.trim(),
-        branch: $('cfg-branch').value.trim() || 'main',
+        token: sanitizeAsciiField($('cfg-token').value),
+        owner: sanitizeAsciiField($('cfg-owner').value),
+        repo: sanitizeAsciiField($('cfg-repo').value),
+        branch: sanitizeAsciiField($('cfg-branch').value) || 'main',
         archiveId: $('cfg-archive-id').value.trim()
     };
 }
@@ -291,6 +317,22 @@ function escapeHtml(str) {
     return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+function buildTagOptionsHtml(selectedTag) {
+    const selectedTrimmed = (selectedTag || '').trim();
+    // Nếu tag đã lưu trước đó không nằm trong danh sách chuẩn (VD do gõ tay
+    // từ trước khi có dropdown), vẫn thêm nó vào đầu danh sách để không mất
+    // dữ liệu đã đặt, đồng thời được chọn sẵn.
+    const options = [...TAG_OPTIONS];
+    if (selectedTrimmed && !options.some(t => t.toLowerCase() === selectedTrimmed.toLowerCase())) {
+        options.unshift(selectedTrimmed);
+    }
+    const optionsHtml = options.map(opt => {
+        const isSelected = opt.toLowerCase() === selectedTrimmed.toLowerCase();
+        return `<option value="${escapeHtml(opt)}" ${isSelected ? 'selected' : ''}>${escapeHtml(opt)}</option>`;
+    }).join('');
+    return `<option value="">-- Chọn chủ đề --</option>${optionsHtml}`;
+}
+
 function renderEpisodesList() {
     const container = $('episodes-list');
     container.innerHTML = currentEpisodeFiles.map((f) => {
@@ -301,7 +343,7 @@ function renderEpisodesList() {
             <label>Tên hiển thị</label>
             <input type="text" class="ep-title" placeholder="${escapeHtml(f.name)}" value="${escapeHtml(override.title || '')}">
             <label>Chủ đề / tag</label>
-            <input type="text" class="ep-tag" placeholder="Podcast" value="${escapeHtml(override.tag || '')}">
+            <select class="ep-tag">${buildTagOptionsHtml(override.tag)}</select>
             <label>Mô tả (hiện trong player)</label>
             <textarea class="ep-desc" placeholder="Không bắt buộc">${escapeHtml(override.description || '')}</textarea>
         </div>`;
@@ -354,7 +396,11 @@ $('btn-connect').addEventListener('click', async () => {
         setConfigStatus(`Đã kết nối. Tìm thấy ${currentEpisodeFiles.length} tập.`, 'success');
         renderEpisodesList();
     } catch (err) {
-        setConfigStatus(err.message, 'error');
+        if (err instanceof TypeError && /header/i.test(err.message)) {
+            setConfigStatus('Token hoặc thông tin bạn nhập chứa ký tự không hợp lệ. Hãy xóa hết ô Token, gõ lại tay từng ký tự đầu/cuối cho chắc, hoặc copy lại token từ GitHub rồi dán lại.', 'error');
+        } else {
+            setConfigStatus(err.message, 'error');
+        }
         console.error(err);
     }
 });
@@ -385,6 +431,18 @@ $('btn-save-all').addEventListener('click', async () => {
         console.error(err);
     } finally {
         btn.disabled = false;
+    }
+});
+
+$('btn-toggle-token').addEventListener('click', () => {
+    const input = $('cfg-token');
+    const icon = $('btn-toggle-token').querySelector('i');
+    if (input.type === 'text') {
+        input.type = 'password';
+        icon.className = 'fa-solid fa-eye-slash';
+    } else {
+        input.type = 'text';
+        icon.className = 'fa-solid fa-eye';
     }
 });
 
