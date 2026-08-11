@@ -21,8 +21,12 @@ const PLAYABLE_EXTENSIONS = ['.mp3', '.m4a', '.wav', '.ogg', '.flac'];
 const UPLOAD_GRACE_PERIOD_MS = 15 * 60 * 1000; // 15 phút
 
 // Counter API (giữ nguyên logic view-counter cũ, đổi namespace theo site mới)
-const COUNTER_NAMESPACE = 'khanz094-audio-space';
-const COUNTER_API_BASE = 'https://api.counterapi.dev/v1';
+// Counter API (đếm lượt nghe). LƯU Ý: CounterAPI v1 đã bị khai tử (7/8/2026),
+// nên bắt buộc dùng v2. v2 yêu cầu bạn tạo 1 workspace CÔNG KHAI (public) tại
+// counterapi.dev (miễn phí, không cần token cho counter công khai) — đặt tên
+// workspace đúng như COUNTER_WORKSPACE bên dưới.
+const COUNTER_WORKSPACE = 'khanz094-audio-space';
+const COUNTER_API_BASE = 'https://api.counterapi.dev/v2';
 
 const HISTORY_KEY = 'khanz094_history_v1';
 const LIKED_KEY = 'khanz094_liked_v1';
@@ -381,7 +385,7 @@ function renderEpisodes({ resetPage = true } = {}) {
             <div class="card-body">
                 <span class="card-tags">${(ep.tags || []).map(t => `<span class="card-tag">${escapeHtml(t)}</span>`).join('')}</span>
                 <h3>${escapeHtml(ep.title)}</h3>
-                <p>${formatDate(ep.date) || 'Khanz094'}</p>
+                <p>${formatDate(ep.date) || 'Khanz094'} <span class="card-views" data-safename="${ep.safeName}"></span></p>
             </div>
         </div>`;
     }).join('');
@@ -423,6 +427,17 @@ function renderEpisodes({ resetPage = true } = {}) {
             renderEpisodes({ resetPage: false });
         });
     }
+
+    // Tải lượt nghe cho các card đang hiện — chạy nền, không chặn render,
+    // và KHÔNG làm tăng số (chỉ xem, không /up).
+    container.querySelectorAll('.card-views').forEach(el => {
+        const safeName = el.getAttribute('data-safename');
+        getViewsOnly(safeName).then(count => {
+            if (count !== null) {
+                el.textContent = `• ${count} lượt nghe`;
+            }
+        });
+    });
 }
 
 function escapeHtml(str) {
@@ -528,16 +543,32 @@ function showToast(message, icon = 'fa-circle-check') {
     }, 2500);
 }
 
-/* ================= 9. VIEW COUNTER (Counter API) ================= */
+/* ================= 9. VIEW COUNTER (Counter API v2) ================= */
+function parseCounterResponse(data) {
+    // Cấu trúc phản hồi v2: { code, data: { up_count, ... } }
+    return data?.data?.up_count ?? data?.data?.value ?? data?.value ?? data?.count ?? 0;
+}
+
 async function bumpAndGetViews(safeName) {
     try {
-        const res = await fetch(`${COUNTER_API_BASE}/${COUNTER_NAMESPACE}/${safeName}/up`);
+        const res = await fetch(`${COUNTER_API_BASE}/${COUNTER_WORKSPACE}/${safeName}/up`);
         if (res.ok) {
             const data = await res.json();
-            const count = data?.data?.up_count ?? data?.count ?? 0;
-            return count;
+            return parseCounterResponse(data);
         }
     } catch (e) { /* offline hoặc lỗi mạng: bỏ qua, không chặn phát nhạc */ }
+    return null;
+}
+
+/** Chỉ LẤY số lượt nghe hiện có, KHÔNG tăng — dùng để hiện lên card ngoài danh sách */
+async function getViewsOnly(safeName) {
+    try {
+        const res = await fetch(`${COUNTER_API_BASE}/${COUNTER_WORKSPACE}/${safeName}`);
+        if (res.ok) {
+            const data = await res.json();
+            return parseCounterResponse(data);
+        }
+    } catch (e) { /* bỏ qua lỗi mạng */ }
     return null;
 }
 
