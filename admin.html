@@ -106,6 +106,56 @@
         border-top: 1px solid var(--border-color);
         margin-top: 20px;
     }
+    .tag-picker-toggle-btn {
+        width: 100%;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 0;
+        background: #0c1220;
+        color: var(--text-color);
+        border: 1px solid var(--border-color);
+        font-weight: 400;
+        text-align: left;
+    }
+    .tag-picker-toggle-btn .tag-picker-summary {
+        color: var(--text-muted);
+        font-size: 0.85rem;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        margin-right: 8px;
+    }
+    .tag-picker-toggle-btn i.fa-chevron-down {
+        transition: transform 0.15s ease;
+        flex-shrink: 0;
+    }
+    .tag-picker-toggle-btn.open i.fa-chevron-down { transform: rotate(180deg); }
+    .tag-picker-panel {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 8px;
+        padding: 10px;
+        background: #0c1220;
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+    }
+    .tag-option-chip {
+        margin: 0;
+        padding: 6px 12px;
+        font-size: 0.78rem;
+        font-weight: 600;
+        border-radius: 999px;
+        background: rgba(255,255,255,0.05);
+        color: var(--text-muted);
+        border: 1px solid var(--border-color);
+    }
+    .tag-option-chip.active {
+        background: var(--primary-gradient);
+        color: #fff;
+        border-color: transparent;
+    }
 </style>
 </head>
 <body>
@@ -319,33 +369,48 @@ function escapeHtml(str) {
     return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-function buildTagOptionsHtml(selectedTag) {
-    const selectedTrimmed = (selectedTag || '').trim();
-    // Nếu tag đã lưu trước đó không nằm trong danh sách chuẩn (VD do gõ tay
-    // từ trước khi có dropdown), vẫn thêm nó vào đầu danh sách để không mất
-    // dữ liệu đã đặt, đồng thời được chọn sẵn.
+function buildTagPickerHtml(selectedTags) {
+    const selected = (selectedTags || []).map(t => t.trim()).filter(Boolean);
+    const selectedKeys = new Set(selected.map(t => t.toLowerCase()));
+
+    // Nếu có tag cũ (gõ tay/lưu trước đây) chưa nằm trong danh sách chuẩn,
+    // vẫn thêm vào đầu danh sách để không mất dữ liệu đã đặt.
     const options = [...TAG_OPTIONS];
-    if (selectedTrimmed && !options.some(t => t.toLowerCase() === selectedTrimmed.toLowerCase())) {
-        options.unshift(selectedTrimmed);
-    }
-    const optionsHtml = options.map(opt => {
-        const isSelected = opt.toLowerCase() === selectedTrimmed.toLowerCase();
-        return `<option value="${escapeHtml(opt)}" ${isSelected ? 'selected' : ''}>${escapeHtml(opt)}</option>`;
+    selected.forEach(t => {
+        if (!options.some(o => o.toLowerCase() === t.toLowerCase())) {
+            options.unshift(t);
+        }
+    });
+
+    const chipsHtml = options.map(opt => {
+        const isActive = selectedKeys.has(opt.toLowerCase());
+        return `<button type="button" class="tag-option-chip${isActive ? ' active' : ''}" data-tag="${escapeHtml(opt)}">${escapeHtml(opt)}</button>`;
     }).join('');
-    return `<option value="">-- Chọn chủ đề --</option>${optionsHtml}`;
+
+    const summary = selected.length > 0 ? selected.join(', ') : 'Chưa chọn chủ đề nào — bấm để chọn';
+
+    return `
+        <button type="button" class="tag-picker-toggle-btn">
+            <span class="tag-picker-summary">${escapeHtml(summary)}</span>
+            <i class="fa-solid fa-chevron-down"></i>
+        </button>
+        <div class="tag-picker-panel hidden">${chipsHtml}</div>`;
 }
 
 function renderEpisodesList() {
     const container = $('episodes-list');
     container.innerHTML = currentEpisodeFiles.map((f) => {
         const override = currentOverrides[f.name] || {};
+        const overrideTags = Array.isArray(override.tags)
+            ? override.tags
+            : (override.tag ? [override.tag] : []);
         return `
         <div class="episode-card" data-filename="${escapeHtml(f.name)}">
             <div class="episode-filename"><i class="fa-solid fa-file-audio"></i> ${escapeHtml(f.name)}</div>
             <label>Tên hiển thị</label>
             <input type="text" class="ep-title" placeholder="${escapeHtml(f.name)}" value="${escapeHtml(override.title || '')}">
-            <label>Chủ đề / tag</label>
-            <select class="ep-tag">${buildTagOptionsHtml(override.tag)}</select>
+            <label>Chủ đề / tag (chọn được nhiều)</label>
+            <div class="tag-picker">${buildTagPickerHtml(overrideTags)}</div>
             <label>Mô tả (hiện trong player)</label>
             <textarea class="ep-desc" placeholder="Không bắt buộc">${escapeHtml(override.description || '')}</textarea>
         </div>`;
@@ -356,6 +421,31 @@ function renderEpisodesList() {
     $('episode-search').value = '';
     filterEpisodesList();
 }
+
+/**
+ * Sự kiện dùng ủy quyền (event delegation) trên toàn bộ danh sách tập —
+ * hoạt động đúng cho mọi card kể cả sau khi render lại, không cần gắn lại
+ * từng phần tử.
+ */
+$('episodes-list').addEventListener('click', (e) => {
+    const toggleBtn = e.target.closest('.tag-picker-toggle-btn');
+    if (toggleBtn) {
+        const panel = toggleBtn.nextElementSibling;
+        panel.classList.toggle('hidden');
+        toggleBtn.classList.toggle('open', !panel.classList.contains('hidden'));
+        return;
+    }
+
+    const chip = e.target.closest('.tag-option-chip');
+    if (chip) {
+        chip.classList.toggle('active');
+        const card = chip.closest('.episode-card');
+        const activeTags = Array.from(card.querySelectorAll('.tag-option-chip.active')).map(c => c.dataset.tag);
+        const summaryEl = card.querySelector('.tag-picker-summary');
+        summaryEl.textContent = activeTags.length > 0 ? activeTags.join(', ') : 'Chưa chọn chủ đề nào — bấm để chọn';
+        return;
+    }
+});
 
 /**
  * Lọc danh sách tập theo tên file / tên đã đặt — chỉ ẩn/hiện DOM, KHÔNG
@@ -384,12 +474,12 @@ function collectOverridesFromForm() {
     document.querySelectorAll('.episode-card').forEach(card => {
         const filename = card.getAttribute('data-filename');
         const title = card.querySelector('.ep-title').value.trim();
-        const tag = card.querySelector('.ep-tag').value.trim();
+        const tags = Array.from(card.querySelectorAll('.tag-option-chip.active')).map(c => c.dataset.tag);
         const description = card.querySelector('.ep-desc').value.trim();
-        if (title || tag || description) {
+        if (title || tags.length > 0 || description) {
             result[filename] = {};
             if (title) result[filename].title = title;
-            if (tag) result[filename].tag = tag;
+            if (tags.length > 0) result[filename].tags = tags;
             if (description) result[filename].description = description;
         }
     });
