@@ -148,6 +148,8 @@
         <p style="color:var(--text-muted); font-size:0.85rem; margin-top:-8px;">
             Để trống ô nào thì web sẽ tự dùng tên file gốc / mặc định cho ô đó.
         </p>
+        <input type="text" id="episode-search" placeholder="🔍 Tìm theo tên file hoặc tên đã đặt..." style="margin-bottom:14px;">
+        <div id="episodes-count" style="color:var(--text-muted); font-size:0.8rem; margin-bottom:10px;"></div>
         <div id="episodes-list"></div>
     </section>
 
@@ -351,6 +353,30 @@ function renderEpisodesList() {
 
     $('episodes-section').classList.remove('hidden');
     $('save-bar').classList.remove('hidden');
+    $('episode-search').value = '';
+    filterEpisodesList();
+}
+
+/**
+ * Lọc danh sách tập theo tên file / tên đã đặt — chỉ ẩn/hiện DOM, KHÔNG
+ * render lại, để không làm mất nội dung đang gõ dở trong các ô input.
+ */
+function filterEpisodesList() {
+    const query = $('episode-search').value.trim().toLowerCase();
+    const cards = document.querySelectorAll('.episode-card');
+    let visibleCount = 0;
+
+    cards.forEach(card => {
+        const filename = card.getAttribute('data-filename').toLowerCase();
+        const titleVal = card.querySelector('.ep-title').value.toLowerCase();
+        const match = !query || filename.includes(query) || titleVal.includes(query);
+        card.style.display = match ? '' : 'none';
+        if (match) visibleCount++;
+    });
+
+    $('episodes-count').textContent = query
+        ? `Hiện ${visibleCount} / ${cards.length} tập`
+        : `Tổng cộng ${cards.length} tập`;
 }
 
 function collectOverridesFromForm() {
@@ -445,6 +471,8 @@ $('btn-toggle-token').addEventListener('click', () => {
         icon.className = 'fa-solid fa-eye';
     }
 });
+
+$('episode-search').addEventListener('input', filterEpisodesList);
 
 loadSavedConfig();
 </script>
