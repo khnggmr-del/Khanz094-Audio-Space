@@ -236,9 +236,20 @@ function formatDate(ts) {
 
 function buildTagFilterChips() {
     const container = document.getElementById('tag-filter-container');
-    const tags = Array.from(new Set(allEpisodes.map(ep => ep.tag))).filter(Boolean);
 
-    if (tags.length <= 1) {
+    // Gộp tag trùng nhau dù khác hoa/thường hoặc thừa khoảng trắng
+    // (VD "Ngôn tình" và "Ngôn Tình" phải được coi là 1 tag).
+    // Giữ lại cách viết xuất hiện ĐẦU TIÊN làm nhãn hiển thị.
+    const tagMap = new Map(); // key chuẩn hóa (lowercase, trim) -> nhãn hiển thị gốc
+    allEpisodes.forEach(ep => {
+        if (!ep.tag) return;
+        const key = ep.tag.trim().toLowerCase();
+        if (key && !tagMap.has(key)) {
+            tagMap.set(key, ep.tag.trim());
+        }
+    });
+
+    if (tagMap.size <= 1) {
         container.classList.add('hidden');
         container.innerHTML = '';
         return;
@@ -257,12 +268,12 @@ function buildTagFilterChips() {
     });
     container.appendChild(allChip);
 
-    tags.forEach(tag => {
+    tagMap.forEach((label, key) => {
         const chip = document.createElement('button');
-        chip.className = 'tag-chip' + (currentTagFilter === tag ? ' active' : '');
-        chip.textContent = tag;
+        chip.className = 'tag-chip' + (currentTagFilter === key ? ' active' : '');
+        chip.textContent = label;
         chip.addEventListener('click', () => {
-            currentTagFilter = (currentTagFilter === tag) ? null : tag;
+            currentTagFilter = (currentTagFilter === key) ? null : key;
             buildTagFilterChips();
             renderEpisodes();
         });
@@ -290,9 +301,9 @@ function getFilteredSortedList() {
         list = list.filter(ep => playlist.includes(ep.safeName));
     }
 
-    // Tag filter
+    // Tag filter (currentTagFilter là key đã chuẩn hóa: lowercase + trim)
     if (currentTagFilter) {
-        list = list.filter(ep => ep.tag === currentTagFilter);
+        list = list.filter(ep => ep.tag && ep.tag.trim().toLowerCase() === currentTagFilter);
     }
 
     // Search
