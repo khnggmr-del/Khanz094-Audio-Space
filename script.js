@@ -661,6 +661,8 @@ function playEpisodeByAllIndex(allIndex) {
     loadTranscript(ep);
     setupMediaSession(ep);
     saveToHistory(ep, resumeTime);
+    loadRatingForEpisode(ep.safeName);
+    loadCommentsForEpisode(ep.safeName);
 
     document.getElementById('player-views-count').textContent = '...';
     bumpAndGetViews(ep.safeName).then(count => {
@@ -1123,6 +1125,300 @@ function setupSearchSort() {
 /* ================= 22. RANDOM BUTTON ================= */
 document.getElementById('random-episode-btn').addEventListener('click', playRandomEpisode);
 
+/* ================= 23. TÀI KHOẢN (Firebase Authentication) ================= */
+// UID của tài khoản quản trị — nếu người đang đăng nhập trùng UID này, họ sẽ
+// thấy nút xóa trên MỌI bình luận (không chỉ bình luận của chính họ), dùng
+// để kiểm duyệt. Lấy UID của bạn tại Firebase Console -> Authentication ->
+// Users (sau khi đã đăng ký 1 tài khoản cho chính mình).
+const ADMIN_UID = 'DÁN_UID_ADMIN_VÀO_ĐÂY';
+
+let currentFirebaseUser = null;
+let isRegisterMode = false;
+
+function translateFirebaseError(code) {
+    const map = {
+        'auth/email-already-in-use': 'Email này đã được đăng ký.',
+        'auth/invalid-email': 'Email không hợp lệ.',
+        'auth/weak-password': 'Mật khẩu quá ngắn (tối thiểu 6 ký tự).',
+        'auth/user-not-found': 'Không tìm thấy tài khoản với email này.',
+        'auth/wrong-password': 'Sai mật khẩu.',
+        'auth/invalid-credential': 'Email hoặc mật khẩu không đúng.',
+        'auth/too-many-requests': 'Thử sai quá nhiều lần, vui lòng đợi 1 lúc rồi thử lại.',
+        'auth/network-request-failed': 'Lỗi kết nối mạng.'
+    };
+    return map[code] || `Có lỗi xảy ra (${code || 'không rõ'}).`;
+}
+
+function updateAuthUI(user) {
+    const authBtnIcon = document.querySelector('#auth-btn i');
+    const loggedOutView = document.getElementById('auth-logged-out');
+    const loggedInView = document.getElementById('auth-logged-in');
+
+    if (user) {
+        authBtnIcon.className = 'fa-solid fa-circle-user';
+        loggedOutView.classList.add('hidden');
+        loggedInView.classList.remove('hidden');
+        document.getElementById('auth-current-name').textContent = user.displayName || 'Người dùng';
+        document.getElementById('auth-current-email').textContent = user.email || '';
+    } else {
+        authBtnIcon.className = 'fa-solid fa-user';
+        loggedOutView.classList.remove('hidden');
+        loggedInView.classList.add('hidden');
+    }
+    updateCommentFormState();
+}
+
+function updateCommentFormState() {
+    const input = document.getElementById('comment-input');
+    const btn = document.getElementById('comment-submit-btn');
+    const ratingHint = document.getElementById('rating-hint');
+    if (!input || !btn || !ratingHint) return;
+
+    if (currentFirebaseUser) {
+        input.disabled = false;
+        input.placeholder = 'Viết bình luận của bạn...';
+        btn.disabled = false;
+        ratingHint.style.display = 'none';
+    } else {
+        input.disabled = true;
+        input.placeholder = 'Đăng nhập để bình luận...';
+        btn.disabled = true;
+        ratingHint.style.display = 'block';
+    }
+}
+
+function setupAuthModal() {
+    const authBtn = document.getElementById('auth-btn');
+    const authModal = document.getElementById('auth-modal');
+    const closeBtn = document.getElementById('auth-close-btn');
+    const toggleModeLink = document.getElementById('auth-toggle-mode');
+    const submitBtn = document.getElementById('auth-submit-btn');
+    const logoutBtn = document.getElementById('auth-logout-btn');
+    const errorEl = document.getElementById('auth-error');
+
+    authBtn.addEventListener('click', () => authModal.classList.remove('hidden'));
+    closeBtn.addEventListener('click', () => authModal.classList.add('hidden'));
+
+    toggleModeLink.addEventListener('click', (e) => {
+        e.preventDefault();
+        isRegisterMode = !isRegisterMode;
+        document.getElementById('auth-form-title').textContent = isRegisterMode ? 'Đăng ký' : 'Đăng nhập';
+        submitBtn.textContent = isRegisterMode ? 'Đăng ký' : 'Đăng nhập';
+        document.getElementById('auth-name-field').classList.toggle('hidden', !isRegisterMode);
+        document.getElementById('auth-toggle-text').textContent = isRegisterMode ? 'Đã có tài khoản?' : 'Chưa có tài khoản?';
+        toggleModeLink.textContent = isRegisterMode ? 'Đăng nhập' : 'Đăng ký ngay';
+        errorEl.style.display = 'none';
+    });
+
+    submitBtn.addEventListener('click', async () => {
+        const email = document.getElementById('auth-email').value.trim();
+        const password = document.getElementById('auth-password').value;
+        errorEl.style.display = 'none';
+
+        if (!email || !password) {
+            errorEl.textContent = 'Vui lòng nhập đủ email và mật khẩu.';
+            errorEl.style.display = 'block';
+            return;
+        }
+
+        submitBtn.disabled = true;
+        try {
+            if (isRegisterMode) {
+                const displayName = document.getElementById('auth-display-name').value.trim();
+                const cred = await fbAuth.createUserWithEmailAndPassword(email, password);
+                if (displayName) await cred.user.updateProfile({ displayName });
+            } else {
+                await fbAuth.signInWithEmailAndPassword(email, password);
+            }
+            authModal.classList.add('hidden');
+            document.getElementById('auth-email').value = '';
+            document.getElementById('auth-password').value = '';
+        } catch (err) {
+            errorEl.textContent = translateFirebaseError(err.code);
+            errorEl.style.display = 'block';
+        } finally {
+            submitBtn.disabled = false;
+        }
+    });
+
+    logoutBtn.addEventListener('click', () => {
+        fbAuth.signOut();
+        authModal.classList.add('hidden');
+    });
+
+    fbAuth.onAuthStateChanged(user => {
+        currentFirebaseUser = user;
+        updateAuthUI(user);
+        if (currentTrackIndex > -1) {
+            const ep = allEpisodes[currentTrackIndex];
+            if (ep) loadRatingForEpisode(ep.safeName);
+        }
+    });
+}
+
+/* ================= 24. ĐÁNH GIÁ (RATING) ================= */
+function highlightStars(value) {
+    document.querySelectorAll('#rating-stars i').forEach(star => {
+        const starValue = parseInt(star.dataset.value, 10);
+        star.className = starValue <= value ? 'fa-solid fa-star' : 'fa-regular fa-star';
+    });
+}
+
+async function loadRatingForEpisode(safeName) {
+    const summaryEl = document.getElementById('rating-summary');
+    if (!summaryEl || !isFirebaseConfigured()) return;
+    summaryEl.textContent = 'Đang tải đánh giá...';
+    highlightStars(0);
+
+    try {
+        const snapshot = await fbDb.collection('ratings').where('episodeSafeName', '==', safeName).get();
+        const values = [];
+        let myValue = 0;
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            values.push(data.value);
+            if (currentFirebaseUser && data.uid === currentFirebaseUser.uid) myValue = data.value;
+        });
+
+        summaryEl.textContent = values.length === 0
+            ? 'Chưa có đánh giá nào'
+            : `${(values.reduce((a, b) => a + b, 0) / values.length).toFixed(1)} / 5 (${values.length} lượt đánh giá)`;
+
+        highlightStars(myValue);
+    } catch (err) {
+        summaryEl.textContent = 'Không tải được đánh giá';
+        console.error('[Firestore ratings]', err);
+    }
+}
+
+function setupRatingStars() {
+    document.querySelectorAll('#rating-stars i').forEach(star => {
+        star.addEventListener('click', async () => {
+            if (!isFirebaseConfigured()) {
+                showToast('Chưa cấu hình Firebase', 'fa-triangle-exclamation');
+                return;
+            }
+            if (!currentFirebaseUser) {
+                document.getElementById('auth-modal').classList.remove('hidden');
+                return;
+            }
+            if (currentTrackIndex === -1) return;
+
+            const ep = allEpisodes[currentTrackIndex];
+            const value = parseInt(star.dataset.value, 10);
+            highlightStars(value); // phản hồi ngay, không đợi mạng
+
+            try {
+                const docId = `${ep.safeName}_${currentFirebaseUser.uid}`;
+                await fbDb.collection('ratings').doc(docId).set({
+                    episodeSafeName: ep.safeName,
+                    uid: currentFirebaseUser.uid,
+                    value: value,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                loadRatingForEpisode(ep.safeName);
+            } catch (err) {
+                showToast('Không thể lưu đánh giá: ' + err.message, 'fa-triangle-exclamation');
+            }
+        });
+    });
+}
+
+/* ================= 25. BÌNH LUẬN ================= */
+function formatCommentTime(date) {
+    return date.toLocaleDateString('vi-VN') + ' ' + date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+}
+
+async function loadCommentsForEpisode(safeName) {
+    const listEl = document.getElementById('comment-list');
+    if (!listEl || !isFirebaseConfigured()) return;
+    listEl.innerHTML = `<div class="loading-spinner"><i class="fa-solid fa-circle-notch fa-spin"></i> Đang tải bình luận...</div>`;
+
+    try {
+        const snapshot = await fbDb.collection('comments')
+            .where('episodeSafeName', '==', safeName)
+            .orderBy('timestamp', 'desc')
+            .get();
+
+        if (snapshot.empty) {
+            listEl.innerHTML = `<p style="color:var(--text-muted); font-size:0.85rem;">Chưa có bình luận nào. Hãy là người đầu tiên!</p>`;
+            return;
+        }
+
+        listEl.innerHTML = snapshot.docs.map(doc => {
+            const data = doc.data();
+            const canDelete = currentFirebaseUser && (currentFirebaseUser.uid === data.uid || currentFirebaseUser.uid === ADMIN_UID);
+            const timeStr = data.timestamp ? formatCommentTime(data.timestamp.toDate()) : '';
+            return `
+            <div class="comment-item">
+                <div class="comment-header">
+                    <strong>${escapeHtml(data.displayName || 'Ẩn danh')}</strong>
+                    <span class="comment-time">${timeStr}</span>
+                    ${canDelete ? `<button class="comment-delete-btn" data-comment-id="${doc.id}" title="Xóa"><i class="fa-solid fa-trash"></i></button>` : ''}
+                </div>
+                <p class="comment-text">${escapeHtml(data.text)}</p>
+            </div>`;
+        }).join('');
+
+        listEl.querySelectorAll('.comment-delete-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                if (!confirm('Xóa bình luận này?')) return;
+                try {
+                    await fbDb.collection('comments').doc(btn.dataset.commentId).delete();
+                    loadCommentsForEpisode(safeName);
+                } catch (err) {
+                    showToast('Không thể xóa: ' + err.message, 'fa-triangle-exclamation');
+                }
+            });
+        });
+    } catch (err) {
+        listEl.innerHTML = `<p style="color:#fca5a5; font-size:0.85rem;">Không tải được bình luận: ${escapeHtml(err.message)}</p>`;
+        console.error('[Firestore comments]', err);
+    }
+}
+
+function setupCommentForm() {
+    document.getElementById('comment-submit-btn').addEventListener('click', async () => {
+        if (!isFirebaseConfigured()) {
+            showToast('Chưa cấu hình Firebase', 'fa-triangle-exclamation');
+            return;
+        }
+        if (!currentFirebaseUser || currentTrackIndex === -1) return;
+
+        const input = document.getElementById('comment-input');
+        const text = input.value.trim();
+        if (!text) return;
+        if (text.length > 1000) {
+            showToast('Bình luận quá dài (tối đa 1000 ký tự)', 'fa-triangle-exclamation');
+            return;
+        }
+
+        const ep = allEpisodes[currentTrackIndex];
+        const btn = document.getElementById('comment-submit-btn');
+        btn.disabled = true;
+
+        try {
+            await fbDb.collection('comments').add({
+                episodeSafeName: ep.safeName,
+                uid: currentFirebaseUser.uid,
+                displayName: currentFirebaseUser.displayName || (currentFirebaseUser.email ? currentFirebaseUser.email.split('@')[0] : 'Ẩn danh'),
+                text: text,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            input.value = '';
+            loadCommentsForEpisode(ep.safeName);
+        } catch (err) {
+            showToast('Không thể gửi bình luận: ' + err.message, 'fa-triangle-exclamation');
+        } finally {
+            btn.disabled = false;
+        }
+    });
+}
+
+function isFirebaseConfigured() {
+    return window.FIREBASE_CONFIGURED === true;
+}
+
 /* ================= 23. INIT ================= */
 async function init() {
     setupTabs();
@@ -1131,6 +1427,17 @@ async function init() {
     setupDropdowns();
     updateTabBadges();
     renderHistory();
+
+    if (isFirebaseConfigured()) {
+        setupAuthModal();
+        setupRatingStars();
+        setupCommentForm();
+    } else {
+        console.warn('Firebase chưa được cấu hình — tính năng đăng nhập/bình luận/đánh giá sẽ không hoạt động. Kiểm tra file firebase-config.js.');
+        document.getElementById('auth-btn').addEventListener('click', () => {
+            showToast('Tính năng đăng nhập chưa được cấu hình', 'fa-triangle-exclamation');
+        });
+    }
 
     const container = document.getElementById('podcast-list');
     try {
