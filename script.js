@@ -1130,7 +1130,7 @@ document.getElementById('random-episode-btn').addEventListener('click', playRand
 // thấy nút xóa trên MỌI bình luận (không chỉ bình luận của chính họ), dùng
 // để kiểm duyệt. Lấy UID của bạn tại Firebase Console -> Authentication ->
 // Users (sau khi đã đăng ký 1 tài khoản cho chính mình).
-const ADMIN_UID = 'xdJOMdcB7efRhGa4by2XZwPg0B73';
+const ADMIN_UID = 'DÁN_UID_ADMIN_VÀO_ĐÂY';
 
 let currentFirebaseUser = null;
 let isRegisterMode = false;
@@ -1187,37 +1187,38 @@ function updateCommentFormState() {
     }
 }
 
+function setAuthMode(register) {
+    isRegisterMode = register;
+    document.getElementById('auth-mode-login-btn').classList.toggle('active', !register);
+    document.getElementById('auth-mode-register-btn').classList.toggle('active', register);
+    document.getElementById('auth-submit-btn').textContent = register ? 'Đăng ký' : 'Đăng nhập';
+    document.getElementById('auth-name-field').classList.toggle('hidden', !register);
+    document.getElementById('auth-error').classList.add('hidden');
+}
+
 function setupAuthModal() {
     const authBtn = document.getElementById('auth-btn');
     const authModal = document.getElementById('auth-modal');
     const closeBtn = document.getElementById('auth-close-btn');
-    const toggleModeLink = document.getElementById('auth-toggle-mode');
     const submitBtn = document.getElementById('auth-submit-btn');
     const logoutBtn = document.getElementById('auth-logout-btn');
     const errorEl = document.getElementById('auth-error');
+    const errorTextEl = errorEl.querySelector('span');
 
     authBtn.addEventListener('click', () => authModal.classList.remove('hidden'));
     closeBtn.addEventListener('click', () => authModal.classList.add('hidden'));
 
-    toggleModeLink.addEventListener('click', (e) => {
-        e.preventDefault();
-        isRegisterMode = !isRegisterMode;
-        document.getElementById('auth-form-title').textContent = isRegisterMode ? 'Đăng ký' : 'Đăng nhập';
-        submitBtn.textContent = isRegisterMode ? 'Đăng ký' : 'Đăng nhập';
-        document.getElementById('auth-name-field').classList.toggle('hidden', !isRegisterMode);
-        document.getElementById('auth-toggle-text').textContent = isRegisterMode ? 'Đã có tài khoản?' : 'Chưa có tài khoản?';
-        toggleModeLink.textContent = isRegisterMode ? 'Đăng nhập' : 'Đăng ký ngay';
-        errorEl.style.display = 'none';
-    });
+    document.getElementById('auth-mode-login-btn').addEventListener('click', () => setAuthMode(false));
+    document.getElementById('auth-mode-register-btn').addEventListener('click', () => setAuthMode(true));
 
     submitBtn.addEventListener('click', async () => {
         const email = document.getElementById('auth-email').value.trim();
         const password = document.getElementById('auth-password').value;
-        errorEl.style.display = 'none';
+        errorEl.classList.add('hidden');
 
         if (!email || !password) {
-            errorEl.textContent = 'Vui lòng nhập đủ email và mật khẩu.';
-            errorEl.style.display = 'block';
+            errorTextEl.textContent = 'Vui lòng nhập đủ email và mật khẩu.';
+            errorEl.classList.remove('hidden');
             return;
         }
 
@@ -1233,9 +1234,10 @@ function setupAuthModal() {
             authModal.classList.add('hidden');
             document.getElementById('auth-email').value = '';
             document.getElementById('auth-password').value = '';
+            document.getElementById('auth-display-name').value = '';
         } catch (err) {
-            errorEl.textContent = translateFirebaseError(err.code);
-            errorEl.style.display = 'block';
+            errorTextEl.textContent = translateFirebaseError(err.code);
+            errorEl.classList.remove('hidden');
         } finally {
             submitBtn.disabled = false;
         }
@@ -1253,6 +1255,7 @@ function setupAuthModal() {
             const ep = allEpisodes[currentTrackIndex];
             if (ep) loadRatingForEpisode(ep.safeName);
         }
+
     });
 }
 
