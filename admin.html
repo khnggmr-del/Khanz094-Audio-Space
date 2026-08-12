@@ -156,6 +156,34 @@
         color: #fff;
         border-color: transparent;
     }
+    .stats-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 0;
+        border-bottom: 1px solid var(--border-color);
+    }
+    .stats-row:last-child { border-bottom: none; }
+    .stats-rank {
+        width: 24px;
+        text-align: center;
+        color: var(--text-muted);
+        font-weight: 700;
+        flex-shrink: 0;
+    }
+    .stats-title {
+        flex: 1;
+        font-size: 0.85rem;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .stats-count {
+        color: var(--primary);
+        font-weight: 700;
+        font-size: 0.85rem;
+        flex-shrink: 0;
+    }
 </style>
 </head>
 <body>
@@ -186,6 +214,9 @@
         <label for="cfg-archive-id">Archive.org identifier (item audio)</label>
         <input type="text" id="cfg-archive-id" value="khanz094-audio-space">
 
+        <label for="cfg-views-worker">URL Worker đếm lượt nghe (để trống nếu không dùng thống kê)</label>
+        <input type="text" id="cfg-views-worker" placeholder="https://khanz094-views-worker.xxx.workers.dev">
+
         <div>
             <button class="btn-primary" id="btn-connect"><i class="fa-solid fa-arrows-rotate"></i> Kết nối &amp; Tải danh sách tập</button>
             <button class="btn-danger" id="btn-clear-config"><i class="fa-solid fa-trash"></i> Xóa thông tin đã lưu trên máy này</button>
@@ -203,6 +234,12 @@
         <div id="episodes-list"></div>
     </section>
 
+    <section id="stats-section" class="hidden">
+        <h2><i class="fa-solid fa-chart-simple"></i> 3. Thống kê lượt nghe</h2>
+        <div id="stats-summary" style="color:var(--text-muted); font-size:0.85rem; margin-bottom:14px;"></div>
+        <div id="stats-list"></div>
+    </section>
+
     <div class="save-bar hidden" id="save-bar">
         <button class="btn-primary" id="btn-save-all"><i class="fa-solid fa-floppy-disk"></i> Lưu tất cả thay đổi lên GitHub</button>
         <div id="save-status" class="status-msg"></div>
@@ -215,7 +252,8 @@ const LS_KEYS = {
     owner: 'khanz094_admin_owner',
     repo: 'khanz094_admin_repo',
     branch: 'khanz094_admin_branch',
-    archiveId: 'khanz094_admin_archive_id'
+    archiveId: 'khanz094_admin_archive_id',
+    viewsWorker: 'khanz094_admin_views_worker'
 };
 const OVERRIDES_PATH = 'metadata-overrides.json';
 const PLAYABLE_EXTENSIONS = ['.mp3', '.m4a', '.wav', '.ogg', '.flac'];
@@ -248,6 +286,7 @@ function loadSavedConfig() {
     $('cfg-repo').value = localStorage.getItem(LS_KEYS.repo) || '';
     $('cfg-branch').value = localStorage.getItem(LS_KEYS.branch) || 'main';
     $('cfg-archive-id').value = localStorage.getItem(LS_KEYS.archiveId) || 'khanz094-audio-space';
+    $('cfg-views-worker').value = localStorage.getItem(LS_KEYS.viewsWorker) || '';
 }
 
 function saveConfigToLocalStorage() {
@@ -256,6 +295,7 @@ function saveConfigToLocalStorage() {
     localStorage.setItem(LS_KEYS.repo, cfg.repo);
     localStorage.setItem(LS_KEYS.branch, cfg.branch);
     localStorage.setItem(LS_KEYS.archiveId, cfg.archiveId);
+    localStorage.setItem(LS_KEYS.viewsWorker, cfg.viewsWorker);
 }
 
 function sanitizeAsciiField(str) {
@@ -271,7 +311,8 @@ function readConfigFromForm() {
         owner: sanitizeAsciiField($('cfg-owner').value),
         repo: sanitizeAsciiField($('cfg-repo').value),
         branch: sanitizeAsciiField($('cfg-branch').value) || 'main',
-        archiveId: $('cfg-archive-id').value.trim()
+        archiveId: $('cfg-archive-id').value.trim(),
+        viewsWorker: sanitizeAsciiField($('cfg-views-worker').value).replace(/\/$/, '')
     };
 }
 
@@ -487,6 +528,72 @@ function collectOverridesFromForm() {
 }
 
 /* ============== SỰ KIỆN ============== */
+/**
+ * Lấy tên hiển thị của 1 tập theo đúng logic ưu tiên giống trang chính:
+ * tên đã đặt qua admin > tên file gốc.
+ */
+function getEpisodeDisplayTitle(filename) {
+    const override = currentOverrides[filename];
+    if (override && override.title) return override.title;
+    const dotIndex = filename.lastIndexOf('.');
+    return dotIndex > -1 ? filename.slice(0, dotIndex) : filename;
+}
+
+function safeNameFromFilename(filename) {
+    const dotIndex = filename.lastIndexOf('.');
+    const nameClean = dotIndex > -1 ? filename.slice(0, dotIndex) : filename;
+    return nameClean
+        .toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)/g, '');
+}
+
+async function loadAndRenderStats() {
+    const section = $('stats-section');
+    const summaryEl = $('stats-summary');
+    const listEl = $('stats-list');
+
+    if (!cfg.viewsWorker) {
+        section.classList.add('hidden');
+        return;
+    }
+
+    section.classList.remove('hidden');
+    summaryEl.textContent = 'Đang tải thống kê...';
+    listEl.innerHTML = '';
+
+    try {
+        const res = await fetch(`${cfg.viewsWorker}/counts`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const counts = await res.json();
+
+        // Ghép lượt nghe (theo safeName) với tên hiển thị của từng tập
+        const rows = currentEpisodeFiles.map(f => {
+            const safeName = safeNameFromFilename(f.name);
+            return {
+                title: getEpisodeDisplayTitle(f.name),
+                count: counts[safeName] || 0
+            };
+        }).sort((a, b) => b.count - a.count);
+
+        const totalViews = rows.reduce((sum, r) => sum + r.count, 0);
+        summaryEl.textContent = `Tổng ${totalViews} lượt nghe trên ${rows.length} tập`;
+
+        listEl.innerHTML = rows.map((r, idx) => `
+            <div class="stats-row">
+                <span class="stats-rank">${idx + 1}</span>
+                <span class="stats-title">${escapeHtml(r.title)}</span>
+                <span class="stats-count">${r.count}</span>
+            </div>
+        `).join('');
+    } catch (err) {
+        summaryEl.textContent = '';
+        listEl.innerHTML = `<div style="color:#fca5a5; font-size:0.85rem;">Không tải được thống kê: ${escapeHtml(err.message)}</div>`;
+        console.error(err);
+    }
+}
+
 $('btn-connect').addEventListener('click', async () => {
     cfg = readConfigFromForm();
 
@@ -511,6 +618,7 @@ $('btn-connect').addEventListener('click', async () => {
 
         setConfigStatus(`Đã kết nối. Tìm thấy ${currentEpisodeFiles.length} tập.`, 'success');
         renderEpisodesList();
+        loadAndRenderStats(); // không await — chạy nền, không chặn phần chính
     } catch (err) {
         if (err instanceof TypeError && /header/i.test(err.message)) {
             setConfigStatus('Token hoặc thông tin bạn nhập chứa ký tự không hợp lệ. Hãy xóa hết ô Token, gõ lại tay từng ký tự đầu/cuối cho chắc, hoặc copy lại token từ GitHub rồi dán lại.', 'error');
