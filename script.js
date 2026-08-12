@@ -1130,7 +1130,7 @@ document.getElementById('random-episode-btn').addEventListener('click', playRand
 // thấy nút xóa trên MỌI bình luận (không chỉ bình luận của chính họ), dùng
 // để kiểm duyệt. Lấy UID của bạn tại Firebase Console -> Authentication ->
 // Users (sau khi đã đăng ký 1 tài khoản cho chính mình).
-const ADMIN_UID = 'DÁN_UID_ADMIN_VÀO_ĐÂY';
+const ADMIN_UID = 'xdJOMdcB7efRhGa4by2XZwPg0B73';
 
 let currentFirebaseUser = null;
 let isRegisterMode = false;
