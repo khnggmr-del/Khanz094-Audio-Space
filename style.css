@@ -1136,3 +1136,85 @@ body {
     color: #a855f7;
 }
 
+
+/* ================= Đăng nhập / Đánh giá / Bình luận ================= */
+.auth-label {
+    display: block;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin: 0.8rem 0 0.3rem;
+}
+
+.auth-input {
+    width: 100%;
+    padding: 0.7rem 0.9rem;
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-color);
+    color: var(--text-color);
+    font-size: 0.9rem;
+    font-family: inherit;
+}
+
+textarea.auth-input {
+    resize: vertical;
+    min-height: 50px;
+}
+
+.rating-stars {
+    display: flex;
+    gap: 6px;
+    font-size: 1.5rem;
+}
+
+.rating-stars i {
+    color: #fbbf24;
+    cursor: pointer;
+    transition: transform 0.1s ease;
+}
+
+.rating-stars i:hover {
+    transform: scale(1.15);
+}
+
+.comment-item {
+    padding: 0.8rem 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.comment-item:last-child { border-bottom: none; }
+
+.comment-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 0.3rem;
+}
+
+.comment-header strong {
+    font-size: 0.85rem;
+    color: var(--text-color);
+}
+
+.comment-time {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+}
+
+.comment-delete-btn {
+    margin-left: auto;
+    background: none;
+    border: none;
+    color: #ef4444;
+    cursor: pointer;
+    font-size: 0.8rem;
+    padding: 4px;
+}
+
+.comment-text {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    line-height: 1.5;
+    white-space: pre-wrap;
+    margin: 0;
+}
