@@ -554,11 +554,26 @@ function isCounterConfigured() {
 }
 
 function counterHeaders() {
-    return { 'Authorization': `Bearer ${COUNTER_ACCESS_TOKEN}` };
+    // Lọc ký tự ẩn/lạ dính theo khi copy-paste (giống lỗi từng gặp với token GitHub)
+    const cleanToken = COUNTER_ACCESS_TOKEN.replace(/[^\x20-\x7E]/g, '').trim();
+    return { 'Authorization': `Bearer ${cleanToken}` };
+}
+
+let counterDebugToastShown = false;
+function reportCounterError(context, detail) {
+    console.error(`[CounterAPI] ${context}:`, detail);
+    // Chỉ hiện 1 lần / lần tải trang để không spam, nhưng đủ để chụp màn hình chẩn đoán
+    if (!counterDebugToastShown) {
+        counterDebugToastShown = true;
+        showToast(`Lỗi đếm lượt nghe (${context}): ${String(detail).slice(0, 80)}`, 'fa-bug');
+    }
 }
 
 async function bumpAndGetViews(safeName) {
-    if (!isCounterConfigured()) return null; // chưa cấu hình API Key -> bỏ qua, không spam lỗi
+    if (!isCounterConfigured()) {
+        reportCounterError('chưa cấu hình', 'COUNTER_ACCESS_TOKEN vẫn là placeholder, chưa dán API Key thật');
+        return null;
+    }
     try {
         const res = await fetch(`${COUNTER_API_BASE}/${COUNTER_WORKSPACE}/${safeName}/up`, {
             headers: counterHeaders()
@@ -567,8 +582,11 @@ async function bumpAndGetViews(safeName) {
             const data = await res.json();
             return parseCounterResponse(data);
         }
-        console.warn('CounterAPI /up lỗi:', res.status, await res.text().catch(() => ''));
-    } catch (e) { /* offline hoặc lỗi mạng: bỏ qua, không chặn phát nhạc */ }
+        const bodyText = await res.text().catch(() => '(không đọc được nội dung lỗi)');
+        reportCounterError(`HTTP ${res.status}`, bodyText);
+    } catch (e) {
+        reportCounterError('lỗi mạng/CORS/fetch', e.message);
+    }
     return null;
 }
 
@@ -583,7 +601,11 @@ async function getViewsOnly(safeName) {
             const data = await res.json();
             return parseCounterResponse(data);
         }
-    } catch (e) { /* bỏ qua lỗi mạng */ }
+        const bodyText = await res.text().catch(() => '(không đọc được nội dung lỗi)');
+        reportCounterError(`HTTP ${res.status} (get)`, bodyText);
+    } catch (e) {
+        reportCounterError('lỗi mạng/CORS/fetch (get)', e.message);
+    }
     return null;
 }
 
