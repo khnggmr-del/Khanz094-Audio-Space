@@ -48,6 +48,9 @@
             <button id="theme-toggle" class="theme-btn" title="Đổi giao diện">
                 <i class="fa-solid fa-moon"></i>
             </button>
+            <button id="auth-btn" class="theme-btn" title="Đăng nhập">
+                <i class="fa-solid fa-user"></i>
+            </button>
         </div>
     </header>
 
@@ -127,6 +130,41 @@
     </section>
 
     <!-- FULL PLAYER VIEW -->
+    <!-- Modal Đăng nhập / Đăng ký -->
+    <div class="player-modal hidden" id="auth-modal">
+        <div class="player-container" style="max-width:420px;">
+            <div class="player-header">
+                <button id="auth-close-btn" class="minimize-btn"><i class="fa-solid fa-xmark"></i></button>
+                <div class="player-header-text"><span>Tài khoản</span></div>
+            </div>
+            <div class="player-content" style="padding:1.5rem;">
+                <div id="auth-logged-out">
+                    <h2 style="margin-top:0;" id="auth-form-title">Đăng nhập</h2>
+                    <label class="auth-label">Email</label>
+                    <input type="email" id="auth-email" class="auth-input" placeholder="ban@email.com" autocomplete="email">
+                    <label class="auth-label">Mật khẩu</label>
+                    <input type="password" id="auth-password" class="auth-input" placeholder="Tối thiểu 6 ký tự" autocomplete="current-password">
+                    <div id="auth-name-field" class="hidden">
+                        <label class="auth-label">Tên hiển thị</label>
+                        <input type="text" id="auth-display-name" class="auth-input" placeholder="Tên bạn muốn hiện khi bình luận">
+                    </div>
+                    <button id="auth-submit-btn" class="play-btn" style="width:100%; margin-top:1rem;">Đăng nhập</button>
+                    <p id="auth-error" style="color:#ef4444; font-size:0.85rem; margin-top:0.8rem; display:none;"></p>
+                    <p style="text-align:center; margin-top:1.2rem; font-size:0.85rem; color:var(--text-muted);">
+                        <span id="auth-toggle-text">Chưa có tài khoản?</span>
+                        <a href="#" id="auth-toggle-mode" style="color:var(--primary); font-weight:600;">Đăng ký ngay</a>
+                    </p>
+                </div>
+                <div id="auth-logged-in" class="hidden" style="text-align:center;">
+                    <i class="fa-solid fa-circle-user" style="font-size:3.5rem; color:var(--primary); margin-bottom:0.8rem;"></i>
+                    <h3 id="auth-current-name">—</h3>
+                    <p style="color:var(--text-muted); font-size:0.85rem;" id="auth-current-email">—</p>
+                    <button id="auth-logout-btn" class="play-btn" style="width:100%; margin-top:1rem; background:transparent; border:1px solid var(--border-color); color:var(--text-color);">Đăng xuất</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="player-modal hidden" id="player-modal">
         <div class="player-container">
             <!-- Header Modal -->
@@ -243,6 +281,36 @@
                         <div class="loading-spinner"><i class="fa-solid fa-circle-notch fa-spin"></i> Đang tải lời...</div>
                     </div>
                 </div>
+
+                <!-- Đánh giá -->
+                <div class="transcript-section">
+                    <div class="transcript-title">
+                        <i class="fa-solid fa-star"></i>
+                        <h3>Đánh giá</h3>
+                    </div>
+                    <div id="rating-summary" style="color:var(--text-muted); font-size:0.85rem; margin-bottom:0.6rem;">Chưa có đánh giá nào</div>
+                    <div id="rating-stars" class="rating-stars">
+                        <i class="fa-regular fa-star" data-value="1"></i>
+                        <i class="fa-regular fa-star" data-value="2"></i>
+                        <i class="fa-regular fa-star" data-value="3"></i>
+                        <i class="fa-regular fa-star" data-value="4"></i>
+                        <i class="fa-regular fa-star" data-value="5"></i>
+                    </div>
+                    <p id="rating-hint" style="color:var(--text-muted); font-size:0.78rem; margin-top:0.4rem;">Đăng nhập để đánh giá tập này</p>
+                </div>
+
+                <!-- Bình luận -->
+                <div class="transcript-section">
+                    <div class="transcript-title">
+                        <i class="fa-solid fa-comments"></i>
+                        <h3>Bình luận</h3>
+                    </div>
+                    <div id="comment-form-area">
+                        <textarea id="comment-input" class="auth-input" placeholder="Đăng nhập để bình luận..." rows="2" disabled></textarea>
+                        <button id="comment-submit-btn" class="play-btn" style="margin-top:0.5rem; padding:0.5rem 1.2rem; font-size:0.85rem;" disabled>Gửi</button>
+                    </div>
+                    <div id="comment-list" style="margin-top:1rem;"></div>
+                </div>
             </div>
         </div>
     </div>
@@ -296,6 +364,12 @@
     </footer>
 
     <!-- File Javascript chính -->
+    <!-- Firebase (đăng nhập + bình luận/đánh giá) -->
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+    <script src="firebase-config.js"></script>
+
     <script src="script.js"></script>
 </body>
 </html>
