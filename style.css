@@ -1218,3 +1218,130 @@ textarea.auth-input {
     white-space: pre-wrap;
     margin: 0;
 }
+
+/* ================= Modal Tài khoản — giao diện mới ================= */
+#auth-logged-out.hidden,
+#auth-logged-in.hidden,
+#auth-name-field.hidden {
+    display: none;
+}
+
+.auth-icon-badge {
+    width: 64px;
+    height: 64px;
+    margin: 0.5rem auto 1.2rem;
+    border-radius: 50%;
+    background: var(--primary-gradient);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.6rem;
+    color: #fff;
+    box-shadow: 0 8px 20px rgba(99, 102, 241, 0.35);
+}
+
+.auth-mode-switch {
+    display: flex;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 4px;
+    margin-bottom: 1.4rem;
+    gap: 4px;
+}
+
+.auth-mode-btn {
+    flex: 1;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    font-weight: 700;
+    font-size: 0.88rem;
+    padding: 0.6rem 0;
+    border-radius: 9px;
+    cursor: pointer;
+    transition: all 0.25s ease;
+}
+
+.auth-mode-btn.active {
+    background: var(--primary-gradient);
+    color: #fff;
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.35);
+}
+
+.auth-field { margin-bottom: 1rem; }
+
+.auth-input-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.auth-input-wrap i {
+    position: absolute;
+    left: 14px;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    pointer-events: none;
+}
+
+.auth-input-wrap .auth-input {
+    padding-left: 42px;
+}
+
+.auth-input:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+}
+
+.auth-error-msg {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: #fca5a5;
+    font-size: 0.82rem;
+    padding: 0.6rem 0.8rem;
+    border-radius: 10px;
+    margin-top: 1rem;
+}
+
+.auth-profile-card {
+    text-align: center;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    padding: 1.8rem 1.2rem;
+    margin-top: 0.5rem;
+}
+
+.auth-profile-avatar {
+    font-size: 3.8rem;
+    color: var(--primary);
+    margin-bottom: 0.6rem;
+}
+
+.auth-profile-card h3 {
+    margin: 0.2rem 0 0.2rem;
+    font-size: 1.15rem;
+}
+
+.auth-profile-card p {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    margin: 0;
+}
+
+.auth-logout-btn {
+    width: 100%;
+    margin-top: 1.2rem;
+    background: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
