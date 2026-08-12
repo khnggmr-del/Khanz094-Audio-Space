@@ -22,11 +22,11 @@ const UPLOAD_GRACE_PERIOD_MS = 15 * 60 * 1000; // 15 phút
 
 // Counter API (giữ nguyên logic view-counter cũ, đổi namespace theo site mới)
 // Counter API (đếm lượt nghe). LƯU Ý: CounterAPI v1 đã bị khai tử (7/8/2026),
-// nên bắt buộc dùng v2. v2 yêu cầu bạn tạo 1 workspace CÔNG KHAI (public) tại
-// counterapi.dev (miễn phí, không cần token cho counter công khai) — đặt tên
-// workspace đúng như COUNTER_WORKSPACE bên dưới.
+// nên bắt buộc dùng v2. v2 yêu cầu API Key trong MỌI request (kể cả counter
+// công khai) — tạo tại counterapi.dev → Dashboard → API Keys, rồi dán vào đây.
 const COUNTER_WORKSPACE = 'khanz094-audio-space';
 const COUNTER_API_BASE = 'https://api.counterapi.dev/v2';
+const COUNTER_ACCESS_TOKEN = 'ut_2BZiH0aWNC3faLcA6MdqIG9tPf3ks370K38oG33J';
 
 const HISTORY_KEY = 'khanz094_history_v1';
 const LIKED_KEY = 'khanz094_liked_v1';
@@ -549,21 +549,36 @@ function parseCounterResponse(data) {
     return data?.data?.up_count ?? data?.data?.value ?? data?.value ?? data?.count ?? 0;
 }
 
+function isCounterConfigured() {
+    return COUNTER_ACCESS_TOKEN && !COUNTER_ACCESS_TOKEN.includes('DÁN_API_KEY');
+}
+
+function counterHeaders() {
+    return { 'Authorization': `Bearer ${COUNTER_ACCESS_TOKEN}` };
+}
+
 async function bumpAndGetViews(safeName) {
+    if (!isCounterConfigured()) return null; // chưa cấu hình API Key -> bỏ qua, không spam lỗi
     try {
-        const res = await fetch(`${COUNTER_API_BASE}/${COUNTER_WORKSPACE}/${safeName}/up`);
+        const res = await fetch(`${COUNTER_API_BASE}/${COUNTER_WORKSPACE}/${safeName}/up`, {
+            headers: counterHeaders()
+        });
         if (res.ok) {
             const data = await res.json();
             return parseCounterResponse(data);
         }
+        console.warn('CounterAPI /up lỗi:', res.status, await res.text().catch(() => ''));
     } catch (e) { /* offline hoặc lỗi mạng: bỏ qua, không chặn phát nhạc */ }
     return null;
 }
 
 /** Chỉ LẤY số lượt nghe hiện có, KHÔNG tăng — dùng để hiện lên card ngoài danh sách */
 async function getViewsOnly(safeName) {
+    if (!isCounterConfigured()) return null;
     try {
-        const res = await fetch(`${COUNTER_API_BASE}/${COUNTER_WORKSPACE}/${safeName}`);
+        const res = await fetch(`${COUNTER_API_BASE}/${COUNTER_WORKSPACE}/${safeName}`, {
+            headers: counterHeaders()
+        });
         if (res.ok) {
             const data = await res.json();
             return parseCounterResponse(data);
