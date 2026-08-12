@@ -20,13 +20,10 @@ const PLAYABLE_EXTENSIONS = ['.mp3', '.m4a', '.wav', '.ogg', '.flac'];
 // trúng và gặp lỗi 404 "giả".
 const UPLOAD_GRACE_PERIOD_MS = 15 * 60 * 1000; // 15 phút
 
-// Counter API (giữ nguyên logic view-counter cũ, đổi namespace theo site mới)
-// Counter API (đếm lượt nghe). LƯU Ý: CounterAPI v1 đã bị khai tử (7/8/2026),
-// nên bắt buộc dùng v2. v2 yêu cầu API Key trong MỌI request (kể cả counter
-// công khai) — tạo tại counterapi.dev → Dashboard → API Keys, rồi dán vào đây.
-const COUNTER_WORKSPACE = 'khanz094-audio-space';
-const COUNTER_API_BASE = 'https://api.counterapi.dev/v2';
-const COUNTER_ACCESS_TOKEN = 'ut_2BZiH0aWNC3faLcA6MdqIG9tPf3ks370K38oG33J';
+// Đếm lượt nghe — Worker Cloudflare tự dựng (không phụ thuộc dịch vụ 3rd-party
+// nào nữa, sau khi CounterAPI v1 chết và v2 không ổn định/không rõ hỗ trợ CORS).
+// Điền đúng URL Worker của bạn sau khi deploy (dạng https://ten-worker.<subdomain>.workers.dev)
+const VIEWS_WORKER_URL = 'https://khanz094-views-worker.khnggmr.workers.dev';
 
 const HISTORY_KEY = 'khanz094_history_v1';
 const LIKED_KEY = 'khanz094_liked_v1';
@@ -428,13 +425,14 @@ function renderEpisodes({ resetPage = true } = {}) {
         });
     }
 
-    // Tải lượt nghe cho các card đang hiện — chạy nền, không chặn render,
-    // và KHÔNG làm tăng số (chỉ xem, không /up).
-    container.querySelectorAll('.card-views').forEach(el => {
-        const safeName = el.getAttribute('data-safename');
-        getViewsOnly(safeName).then(count => {
-            if (count !== null) {
-                el.textContent = `• ${count} lượt nghe`;
+    // Tải lượt nghe cho các card đang hiện — CHỈ 1 request duy nhất cho
+    // toàn bộ danh sách (thay vì gọi riêng từng card), chạy nền không chặn
+    // render, và KHÔNG làm tăng số (chỉ xem, không /up).
+    fetchAllViewCounts().then(counts => {
+        container.querySelectorAll('.card-views').forEach(el => {
+            const safeName = el.getAttribute('data-safename');
+            if (counts[safeName] !== undefined) {
+                el.textContent = `• ${counts[safeName]} lượt nghe`;
             }
         });
     });
@@ -544,69 +542,59 @@ function showToast(message, icon = 'fa-circle-check') {
 }
 
 /* ================= 9. VIEW COUNTER (Counter API v2) ================= */
-function parseCounterResponse(data) {
-    // Cấu trúc phản hồi v2: { code, data: { up_count, ... } }
-    return data?.data?.up_count ?? data?.data?.value ?? data?.value ?? data?.count ?? 0;
+function isViewsWorkerConfigured() {
+    return VIEWS_WORKER_URL && !VIEWS_WORKER_URL.includes('DÁN_URL_WORKER');
 }
 
-function isCounterConfigured() {
-    return COUNTER_ACCESS_TOKEN && !COUNTER_ACCESS_TOKEN.includes('DÁN_API_KEY');
-}
-
-function counterHeaders() {
-    // Lọc ký tự ẩn/lạ dính theo khi copy-paste (giống lỗi từng gặp với token GitHub)
-    const cleanToken = COUNTER_ACCESS_TOKEN.replace(/[^\x20-\x7E]/g, '').trim();
-    return { 'Authorization': `Bearer ${cleanToken}` };
-}
-
-let counterDebugToastShown = false;
-function reportCounterError(context, detail) {
-    console.error(`[CounterAPI] ${context}:`, detail);
+let viewsWorkerDebugToastShown = false;
+function reportViewsWorkerError(context, detail) {
+    console.error(`[ViewsWorker] ${context}:`, detail);
     // Chỉ hiện 1 lần / lần tải trang để không spam, nhưng đủ để chụp màn hình chẩn đoán
-    if (!counterDebugToastShown) {
-        counterDebugToastShown = true;
+    if (!viewsWorkerDebugToastShown) {
+        viewsWorkerDebugToastShown = true;
         showToast(`Lỗi đếm lượt nghe (${context}): ${String(detail).slice(0, 80)}`, 'fa-bug');
     }
 }
 
+/** Tăng lượt nghe của 1 tập lên 1, gọi khi thực sự mở phát */
 async function bumpAndGetViews(safeName) {
-    if (!isCounterConfigured()) {
-        reportCounterError('chưa cấu hình', 'COUNTER_ACCESS_TOKEN vẫn là placeholder, chưa dán API Key thật');
+    if (!isViewsWorkerConfigured()) {
+        reportViewsWorkerError('chưa cấu hình', 'VIEWS_WORKER_URL vẫn là placeholder, chưa dán URL Worker thật');
         return null;
     }
     try {
-        const res = await fetch(`${COUNTER_API_BASE}/${COUNTER_WORKSPACE}/${safeName}/up`, {
-            headers: counterHeaders()
-        });
+        const res = await fetch(`${VIEWS_WORKER_URL}/up?ep=${encodeURIComponent(safeName)}`);
         if (res.ok) {
             const data = await res.json();
-            return parseCounterResponse(data);
+            return typeof data.count === 'number' ? data.count : null;
         }
         const bodyText = await res.text().catch(() => '(không đọc được nội dung lỗi)');
-        reportCounterError(`HTTP ${res.status}`, bodyText);
+        reportViewsWorkerError(`HTTP ${res.status}`, bodyText);
     } catch (e) {
-        reportCounterError('lỗi mạng/CORS/fetch', e.message);
+        reportViewsWorkerError('lỗi mạng/CORS/fetch', e.message);
     }
     return null;
 }
 
-/** Chỉ LẤY số lượt nghe hiện có, KHÔNG tăng — dùng để hiện lên card ngoài danh sách */
-async function getViewsOnly(safeName) {
-    if (!isCounterConfigured()) return null;
+/**
+ * Lấy lượt nghe của TẤT CẢ các tập cùng lúc (1 request duy nhất, KHÔNG tăng số)
+ * — dùng để hiện lên từng card trong danh sách, tránh gọi API riêng lẻ cho
+ * mỗi card gây chậm khi thư viện có nhiều tập.
+ */
+async function fetchAllViewCounts() {
+    if (!isViewsWorkerConfigured()) return {};
     try {
-        const res = await fetch(`${COUNTER_API_BASE}/${COUNTER_WORKSPACE}/${safeName}`, {
-            headers: counterHeaders()
-        });
+        const res = await fetch(`${VIEWS_WORKER_URL}/counts`);
         if (res.ok) {
             const data = await res.json();
-            return parseCounterResponse(data);
+            return (data && typeof data === 'object') ? data : {};
         }
         const bodyText = await res.text().catch(() => '(không đọc được nội dung lỗi)');
-        reportCounterError(`HTTP ${res.status} (get)`, bodyText);
+        reportViewsWorkerError(`HTTP ${res.status} (counts)`, bodyText);
     } catch (e) {
-        reportCounterError('lỗi mạng/CORS/fetch (get)', e.message);
+        reportViewsWorkerError('lỗi mạng/CORS/fetch (counts)', e.message);
     }
-    return null;
+    return {};
 }
 
 /* ================= 10. MÔ TẢ / TRANSCRIPT ================= */
