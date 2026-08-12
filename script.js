@@ -597,8 +597,8 @@ async function fetchAllViewCounts() {
     return {};
 }
 
-/* ================= 10. MÔ TẢ / TRANSCRIPT ================= */
-async function loadTranscript(ep) {
+/* ================= 10. MÔ TẢ ================= */
+async function loadDescription(ep) {
     const box = document.getElementById('transcript-text');
     if (ep && ep.description) {
         box.innerHTML = `<p style="white-space:pre-wrap;">${escapeHtml(ep.description)}</p>`;
@@ -658,7 +658,7 @@ function playEpisodeByAllIndex(allIndex) {
 
     openPlayerModal();
     updatePlayerActionStates();
-    loadTranscript(ep);
+    loadDescription(ep);
     setupMediaSession(ep);
     saveToHistory(ep, resumeTime);
     loadRatingForEpisode(ep.safeName);
@@ -1332,23 +1332,48 @@ function formatCommentTime(date) {
     return date.toLocaleDateString('vi-VN') + ' ' + date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
 }
 
-async function loadCommentsForEpisode(safeName) {
+const COMMENTS_PAGE_SIZE = 20;
+let lastCommentDoc = null;
+let currentCommentsSafeName = null;
+
+async function loadCommentsForEpisode(safeName, { loadMore = false } = {}) {
     const listEl = document.getElementById('comment-list');
     if (!listEl || !isFirebaseConfigured()) return;
-    listEl.innerHTML = `<div class="loading-spinner"><i class="fa-solid fa-circle-notch fa-spin"></i> Đang tải bình luận...</div>`;
+
+    if (!loadMore) {
+        currentCommentsSafeName = safeName;
+        lastCommentDoc = null;
+        listEl.innerHTML = `<div class="loading-spinner"><i class="fa-solid fa-circle-notch fa-spin"></i> Đang tải bình luận...</div>`;
+    }
 
     try {
-        const snapshot = await fbDb.collection('comments')
+        let query = fbDb.collection('comments')
             .where('episodeSafeName', '==', safeName)
             .orderBy('timestamp', 'desc')
-            .get();
+            .limit(COMMENTS_PAGE_SIZE);
 
-        if (snapshot.empty) {
+        if (loadMore && lastCommentDoc) {
+            query = query.startAfter(lastCommentDoc);
+        }
+
+        const snapshot = await query.get();
+
+        // Nếu người dùng đã chuyển sang tập khác trong lúc đang tải, bỏ qua
+        // kết quả trả về muộn này (tránh hiện nhầm bình luận của tập cũ).
+        if (safeName !== currentCommentsSafeName) return;
+
+        if (snapshot.empty && !loadMore) {
             listEl.innerHTML = `<p style="color:var(--text-muted); font-size:0.85rem;">Chưa có bình luận nào. Hãy là người đầu tiên!</p>`;
             return;
         }
 
-        listEl.innerHTML = snapshot.docs.map(doc => {
+        if (!loadMore) listEl.innerHTML = '';
+
+        // Xóa nút "tải thêm" cũ trước khi thêm nội dung mới vào cuối
+        const oldLoadMoreBtn = document.getElementById('comment-load-more-btn');
+        if (oldLoadMoreBtn) oldLoadMoreBtn.remove();
+
+        const itemsHtml = snapshot.docs.map(doc => {
             const data = doc.data();
             const canDelete = currentFirebaseUser && (currentFirebaseUser.uid === data.uid || currentFirebaseUser.uid === ADMIN_UID);
             const timeStr = data.timestamp ? formatCommentTime(data.timestamp.toDate()) : '';
@@ -1363,7 +1388,10 @@ async function loadCommentsForEpisode(safeName) {
             </div>`;
         }).join('');
 
-        listEl.querySelectorAll('.comment-delete-btn').forEach(btn => {
+        listEl.insertAdjacentHTML('beforeend', itemsHtml);
+
+        listEl.querySelectorAll('.comment-delete-btn:not([data-bound])').forEach(btn => {
+            btn.setAttribute('data-bound', '1');
             btn.addEventListener('click', async () => {
                 if (!confirm('Xóa bình luận này?')) return;
                 try {
@@ -1374,8 +1402,28 @@ async function loadCommentsForEpisode(safeName) {
                 }
             });
         });
+
+        if (snapshot.docs.length > 0) {
+            lastCommentDoc = snapshot.docs[snapshot.docs.length - 1];
+        }
+
+        // Còn đúng bằng PAGE_SIZE nghĩa là NHIỀU KHẢ NĂNG còn thêm bình luận
+        // phía sau — hiện nút tải thêm thay vì tải hết 1 lần.
+        if (snapshot.docs.length === COMMENTS_PAGE_SIZE) {
+            const btn = document.createElement('button');
+            btn.id = 'comment-load-more-btn';
+            btn.className = 'tag-chip';
+            btn.style.cssText = 'width:100%; margin-top:10px; padding:10px; font-size:0.85rem;';
+            btn.innerHTML = '<i class="fa-solid fa-chevron-down"></i> Tải thêm bình luận';
+            btn.addEventListener('click', () => loadCommentsForEpisode(safeName, { loadMore: true }));
+            listEl.appendChild(btn);
+        }
     } catch (err) {
-        listEl.innerHTML = `<p style="color:#fca5a5; font-size:0.85rem;">Không tải được bình luận: ${escapeHtml(err.message)}</p>`;
+        if (loadMore) {
+            showToast('Không tải thêm được bình luận: ' + err.message, 'fa-triangle-exclamation');
+        } else {
+            listEl.innerHTML = `<p style="color:#fca5a5; font-size:0.85rem;">Không tải được bình luận: ${escapeHtml(err.message)}</p>`;
+        }
         console.error('[Firestore comments]', err);
     }
 }
