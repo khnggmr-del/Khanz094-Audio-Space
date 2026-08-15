@@ -39,6 +39,7 @@ const METADATA_OVERRIDES_URL = './metadata-overrides.json';
 /* ================= 2. STATE ================= */
 let allEpisodes = [];       // Toàn bộ tập, đã chuẩn hoá từ Archive.org
 let currentList = [];       // Danh sách đang hiển thị sau filter/sort/search
+let episodeViewCountsCache = {}; // { safeName: count } — lấy 1 lần, dùng chung cho sort + hiện trên card
 let currentTab = 'all';
 let currentTagFilter = null;
 let currentTrackIndex = -1;
@@ -339,6 +340,8 @@ function getFilteredSortedList() {
         list.sort((a, b) => (a.date || a.originalIndex) - (b.date || b.originalIndex));
     } else if (sortMode === 'az') {
         list.sort((a, b) => a.title.localeCompare(b.title, 'vi'));
+    } else if (sortMode === 'views') {
+        list.sort((a, b) => (episodeViewCountsCache[b.safeName] || 0) - (episodeViewCountsCache[a.safeName] || 0));
     }
 
     return list;
@@ -425,16 +428,13 @@ function renderEpisodes({ resetPage = true } = {}) {
         });
     }
 
-    // Tải lượt nghe cho các card đang hiện — CHỈ 1 request duy nhất cho
-    // toàn bộ danh sách (thay vì gọi riêng từng card), chạy nền không chặn
-    // render, và KHÔNG làm tăng số (chỉ xem, không /up).
-    fetchAllViewCounts().then(counts => {
-        container.querySelectorAll('.card-views').forEach(el => {
-            const safeName = el.getAttribute('data-safename');
-            if (counts[safeName] !== undefined) {
-                el.textContent = `• ${counts[safeName]} lượt nghe`;
-            }
-        });
+    // Hiện lượt nghe từ cache đã tải sẵn (không gọi lại API mỗi lần render —
+    // đỡ tốn request thừa mỗi khi đổi tab/lọc/tìm kiếm/tải thêm trang).
+    container.querySelectorAll('.card-views').forEach(el => {
+        const safeName = el.getAttribute('data-safename');
+        if (episodeViewCountsCache[safeName] !== undefined) {
+            el.textContent = `• ${episodeViewCountsCache[safeName]} lượt nghe`;
+        }
     });
 }
 
@@ -668,6 +668,7 @@ function playEpisodeByAllIndex(allIndex) {
     bumpAndGetViews(ep.safeName).then(count => {
         if (count !== null) {
             document.getElementById('player-views-count').textContent = count;
+            episodeViewCountsCache[ep.safeName] = count;
         } else {
             document.getElementById('player-views-count').textContent = '—';
         }
@@ -1492,11 +1493,13 @@ async function init() {
 
     const container = document.getElementById('podcast-list');
     try {
-        const [rawEpisodes, overrides] = await Promise.all([
+        const [rawEpisodes, overrides, viewCounts] = await Promise.all([
             fetchAudioFromArchive(),
-            loadMetadataOverrides()
+            loadMetadataOverrides(),
+            fetchAllViewCounts()
         ]);
         allEpisodes = applyMetadataOverrides(rawEpisodes, overrides);
+        episodeViewCountsCache = viewCounts;
 
         if (allEpisodes.length === 0) {
             container.innerHTML = `<div class="loading-spinner"><i class="fa-solid fa-triangle-exclamation"></i> Chưa có tập audio nào trên Internet Archive.</div>`;
