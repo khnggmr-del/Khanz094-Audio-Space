@@ -1268,6 +1268,12 @@ function highlightStars(value) {
     });
 }
 
+/**
+ * Đọc đánh giá qua bảng tổng hợp (rating_aggregates) — CHỈ 2 lần đọc cố định
+ * (1 lần đọc tổng {sum, count} + 1 lần đọc đánh giá riêng của người đang
+ * đăng nhập), không phụ thuộc số lượng đánh giá của tập đó là bao nhiêu.
+ * Bảng tổng hợp được cập nhật ngay trong lúc gửi đánh giá (xem setupRatingStars).
+ */
 async function loadRatingForEpisode(safeName) {
     const summaryEl = document.getElementById('rating-summary');
     if (!summaryEl || !isFirebaseConfigured()) return;
@@ -1275,25 +1281,26 @@ async function loadRatingForEpisode(safeName) {
     highlightStars(0);
 
     try {
-        const snapshot = await fbDb.collection('ratings').where('episodeSafeName', '==', safeName).get();
-        const values = [];
-        let myValue = 0;
-        snapshot.forEach(doc => {
-            const data = doc.data();
-            values.push(data.value);
-            if (currentFirebaseUser && data.uid === currentFirebaseUser.uid) myValue = data.value;
-        });
+        const aggregateDoc = await fbDb.collection('rating_aggregates').doc(safeName).get();
+        const aggData = aggregateDoc.exists ? aggregateDoc.data() : { sum: 0, count: 0 };
 
-        summaryEl.textContent = values.length === 0
+        summaryEl.textContent = !aggData.count
             ? 'Chưa có đánh giá nào'
-            : `${(values.reduce((a, b) => a + b, 0) / values.length).toFixed(1)} / 5 (${values.length} lượt đánh giá)`;
+            : `${(aggData.sum / aggData.count).toFixed(1)} / 5 (${aggData.count} lượt đánh giá)`;
 
+        let myValue = 0;
+        if (currentFirebaseUser) {
+            const myDoc = await fbDb.collection('ratings').doc(`${safeName}_${currentFirebaseUser.uid}`).get();
+            if (myDoc.exists) myValue = myDoc.data().value;
+        }
         highlightStars(myValue);
     } catch (err) {
         summaryEl.textContent = 'Không tải được đánh giá';
         console.error('[Firestore ratings]', err);
     }
 }
+
+let isSavingRating = false;
 
 function setupRatingStars() {
     document.querySelectorAll('#rating-stars i').forEach(star => {
@@ -1307,22 +1314,49 @@ function setupRatingStars() {
                 return;
             }
             if (currentTrackIndex === -1) return;
+            if (isSavingRating) return; // chặn bấm liên tục khi đang lưu, tránh ghi trùng
 
             const ep = allEpisodes[currentTrackIndex];
             const value = parseInt(star.dataset.value, 10);
             highlightStars(value); // phản hồi ngay, không đợi mạng
+            isSavingRating = true;
 
             try {
-                const docId = `${ep.safeName}_${currentFirebaseUser.uid}`;
-                await fbDb.collection('ratings').doc(docId).set({
-                    episodeSafeName: ep.safeName,
-                    uid: currentFirebaseUser.uid,
-                    value: value,
-                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                const ratingRef = fbDb.collection('ratings').doc(`${ep.safeName}_${currentFirebaseUser.uid}`);
+                const aggregateRef = fbDb.collection('rating_aggregates').doc(ep.safeName);
+
+                // Dùng transaction để cộng/trừ đúng vào tổng {sum, count} một
+                // cách an toàn dù nhiều người cùng đánh giá cùng lúc.
+                await fbDb.runTransaction(async (tx) => {
+                    const ratingDoc = await tx.get(ratingRef);
+                    const aggregateDoc = await tx.get(aggregateRef);
+
+                    const oldValue = ratingDoc.exists ? ratingDoc.data().value : null;
+                    const aggData = aggregateDoc.exists ? aggregateDoc.data() : { sum: 0, count: 0 };
+
+                    let newSum = aggData.sum;
+                    let newCount = aggData.count;
+                    if (oldValue === null) {
+                        newSum += value;
+                        newCount += 1;
+                    } else {
+                        newSum += (value - oldValue);
+                    }
+
+                    tx.set(ratingRef, {
+                        episodeSafeName: ep.safeName,
+                        uid: currentFirebaseUser.uid,
+                        value: value,
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    tx.set(aggregateRef, { sum: newSum, count: newCount });
                 });
+
                 loadRatingForEpisode(ep.safeName);
             } catch (err) {
                 showToast('Không thể lưu đánh giá: ' + err.message, 'fa-triangle-exclamation');
+            } finally {
+                isSavingRating = false;
             }
         });
     });
