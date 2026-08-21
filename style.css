@@ -253,7 +253,8 @@ body {
     border-radius: 30px;
     gap: 0.6rem;
     width: 100%;
-    flex: 1;
+    flex: 1 1 auto;
+    min-width: 0;
 }
 
 @media (min-width: 600px) {
@@ -270,18 +271,73 @@ body {
     width: 100%;
 }
 
-/* Chip lọc theo chủ đề/tag */
-.tag-filter-container {
+/* Nút phễu lọc chủ đề */
+.filter-dropdown-wrapper {
+    position: relative;
+    flex-shrink: 0;
+}
+
+.filter-dropdown-wrapper.hidden { display: none; }
+
+.filter-toggle-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.95rem;
+    position: relative;
+}
+
+.filter-active-dot {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--primary-gradient);
+    border: 2px solid var(--card-bg);
+}
+
+.filter-active-dot.hidden { display: none; }
+
+/* Panel thả xuống chứa các chip chủ đề — dùng #id để chắc chắn thắng
+   .dropdown-menu về độ ưu tiên CSS bất kể thứ tự trong file. */
+#tag-filter-container {
+    position: absolute;
+    top: calc(100% + 10px);
+    right: 0;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    padding: 0.9rem;
+    box-shadow: var(--shadow);
+    z-index: 200;
+    width: max(260px, 70vw);
+    max-width: 340px;
+    max-height: 60vh;
+    overflow-y: auto;
     display: flex;
     flex-wrap: wrap;
     gap: 0.5rem;
-    margin-bottom: 1.5rem;
+    animation: filter-panel-in 0.25s var(--ease-smooth);
 }
 
-.tag-filter-container.hidden { display: none; }
+#tag-filter-container.hidden { display: none; }
+
+@keyframes filter-panel-in {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
 
 .tag-chip {
-    background: var(--card-bg);
+    background: var(--bg-color);
     border: 1px solid var(--border-color);
     color: var(--text-muted);
     padding: 0.35rem 0.9rem;
@@ -822,7 +878,7 @@ body {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    color: var(--text-main);
+    color: var(--text-color);
 }
 
 .history-info p {
@@ -850,7 +906,7 @@ body {
 .extra-btn {
     background: rgba(255, 255, 255, 0.08);
     border: 1px solid var(--border-color, rgba(255,255,255,0.1));
-    color: var(--text-main, #ffffff);
+    color: var(--text-color);
     padding: 6px 14px;
     border-radius: 20px;
     font-size: 0.82rem;
@@ -903,7 +959,7 @@ body {
 
 .menu-title {
     font-size: 0.75rem;
-    color: var(--text-muted, #94a3b8);
+    color: var(--text-muted);
     padding: 4px 10px;
     font-weight: 700;
     text-transform: uppercase;
@@ -915,7 +971,7 @@ body {
 .menu-item {
     background: transparent;
     border: none;
-    color: var(--text-main, #fff);
+    color: var(--text-color);
     padding: 8px 12px;
     font-size: 0.85rem;
     font-weight: 600;
@@ -960,9 +1016,9 @@ body {
     gap: 6px;
     padding: 8px 12px;
     border-radius: 20px;
-    background: var(--bg-card, #1e1b4b);
-    color: var(--text-muted, #94a3b8);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: var(--card-bg);
+    color: var(--text-muted);
+    border: 1px solid var(--border-color);
     font-size: 13px;
     font-weight: 600;
     cursor: pointer;
@@ -987,8 +1043,8 @@ body {
 }
 
 .tab-btn:not(.active) .tab-badge {
-    background: rgba(255, 255, 255, 0.1);
-    color: var(--text-main, #f8fafc);
+    background: rgba(232, 169, 74, 0.15);
+    color: var(--text-color);
 }
 
 /* NÚT LIKE & PLAYLIST TRÊN CARD */
@@ -1047,7 +1103,7 @@ body {
 .action-btn {
     background: rgba(255, 255, 255, 0.08);
     border: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
-    color: var(--text-main, #fff);
+    color: var(--text-color);
     width: 36px;
     height: 36px;
     border-radius: 50%;
@@ -1153,7 +1209,7 @@ body {
 }
 
 .copyright {
-    color: var(--text-main, #f8fafc);
+    color: var(--text-color);
     font-size: 0.85rem;
     opacity: 0.9;
 }
@@ -1180,7 +1236,7 @@ body {
 }
 
 .disclaimer-card p {
-    color: var(--text-muted, #94a3b8);
+    color: var(--text-muted);
     font-size: 0.78rem;
     line-height: 1.6;
     margin-bottom: 10px;
