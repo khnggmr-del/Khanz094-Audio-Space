@@ -248,7 +248,9 @@ function formatDate(ts) {
 }
 
 function buildTagFilterChips() {
+    const wrapper = document.getElementById('tag-filter-wrapper');
     const container = document.getElementById('tag-filter-container');
+    const activeDot = document.getElementById('filter-active-dot');
 
     // Gộp tag trùng nhau dù khác hoa/thường hoặc thừa khoảng trắng
     // (VD "Ngôn tình" và "Ngôn Tình" phải được coi là 1 tag).
@@ -264,13 +266,18 @@ function buildTagFilterChips() {
         });
     });
 
+    activeDot.classList.toggle('hidden', currentTagFilter === null);
+
     if (tagMap.size <= 1) {
-        container.classList.add('hidden');
+        wrapper.classList.add('hidden');
         container.innerHTML = '';
         return;
     }
 
-    container.classList.remove('hidden');
+    // Chỉ hiện nút phễu — KHÔNG tự mở panel (giữ nguyên trạng thái đóng/mở
+    // hiện tại của người dùng, kể cả khi hàm này được gọi lại sau mỗi lần
+    // bấm chọn 1 chip).
+    wrapper.classList.remove('hidden');
     container.innerHTML = '';
 
     const allChip = document.createElement('button');
@@ -932,8 +939,20 @@ function setupDropdowns() {
             menu.classList.toggle('hidden');
         });
     });
+
+    // Nút phễu lọc chủ đề — dùng chung cơ chế đóng khi bấm ra ngoài bên dưới
+    const tagFilterToggleBtn = document.getElementById('tag-filter-toggle-btn');
+    const tagFilterPanel = document.getElementById('tag-filter-container');
+    tagFilterToggleBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.add('hidden'));
+        tagFilterPanel.classList.toggle('hidden');
+    });
+    tagFilterPanel.addEventListener('click', (e) => e.stopPropagation());
+
     document.addEventListener('click', () => {
         document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.add('hidden'));
+        tagFilterPanel.classList.add('hidden');
     });
 }
 
