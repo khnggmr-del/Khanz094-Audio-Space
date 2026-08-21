@@ -107,11 +107,17 @@
                     <i class="fa-solid fa-magnifying-glass"></i>
                     <input type="text" id="search-input" placeholder="Tìm kiếm tập podcast...">
                 </div>
+
+                <!-- Nút phễu lọc chủ đề -->
+                <div class="filter-dropdown-wrapper hidden" id="tag-filter-wrapper">
+                    <button class="filter-toggle-btn" id="tag-filter-toggle-btn" title="Lọc theo chủ đề">
+                        <i class="fa-solid fa-filter"></i>
+                        <span class="filter-active-dot hidden" id="filter-active-dot"></span>
+                    </button>
+                    <div id="tag-filter-container" class="tag-filter-container hidden"></div>
+                </div>
             </div>
         </div>
-
-        <!-- Chip lọc theo chủ đề -->
-        <div id="tag-filter-container" class="tag-filter-container hidden"></div>
 
         <!-- LỊCH SỬ NGHE -->
         <section id="history-section" class="history-container hidden">
