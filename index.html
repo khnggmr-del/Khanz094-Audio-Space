@@ -188,9 +188,12 @@
 
                 <div id="auth-logged-in" class="hidden">
                     <div class="auth-profile-card">
-                        <i class="fa-solid fa-circle-user auth-profile-avatar"></i>
+                        <div class="auth-profile-avatar-ring">
+                            <div class="auth-profile-avatar"><i class="fa-solid fa-user"></i></div>
+                        </div>
                         <h3 id="auth-current-name">—</h3>
-                        <p id="auth-current-email">—</p>
+                        <p><i class="fa-solid fa-envelope" style="font-size:0.75rem;"></i> <span id="auth-current-email">—</span></p>
+                        <div class="auth-profile-divider"></div>
                     </div>
                     <button id="auth-logout-btn" class="play-btn auth-logout-btn">
                         <i class="fa-solid fa-right-from-bracket"></i> Đăng xuất
@@ -216,7 +219,7 @@
             <div class="player-content">
                 <!-- Bìa Postcard -->
                 <div class="cover-box">
-                    <img id="player-cover" src="" alt="Podcast Cover">
+                    <div id="player-cover"></div>
                     <div class="playing-badge" id="playing-badge">
                         <span class="eq-bar-mini"></span><span class="eq-bar-mini"></span><span class="eq-bar-mini"></span> Đang phát
                     </div>
@@ -354,7 +357,7 @@
     <!-- Mini Bottom Bar -->
     <div class="mini-player hidden" id="mini-player">
         <div class="mini-info" id="expand-player-btn">
-            <img id="mini-cover" src="" alt="Cover">
+            <div id="mini-cover"></div>
             <div class="mini-text">
                 <h4 id="mini-title">Tên bài</h4>
                 <p id="mini-artist">Khanz094</p>
