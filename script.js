@@ -378,7 +378,7 @@ function renderEpisodes({ resetPage = true } = {}) {
         return `
         <div class="podcast-card" data-safename="${ep.safeName}">
             <div class="card-img">
-                <img src="${ep.cover}" alt="${escapeHtml(ep.title)}" loading="lazy" onerror="this.src='https://archive.org/images/notfound.png'">
+                ${buildCoverArtHtml(ep.safeName)}
                 <div class="card-actions-overlay">
                     <button class="card-btn-icon like-toggle ${isLiked ? 'liked' : ''}" title="Thích">
                         <i class="fa-${isLiked ? 'solid' : 'regular'} fa-heart"></i>
@@ -443,6 +443,34 @@ function renderEpisodes({ resetPage = true } = {}) {
             el.textContent = `• ${episodeViewCountsCache[safeName]} lượt nghe`;
         }
     });
+}
+
+// Bìa "audiobook cover" thay cho ảnh thumbnail tĩnh (vốn dùng chung 1 ảnh
+// cho mọi tập, không mang thông tin riêng gì). Màu được chọn theo hash tên
+// tập -> mỗi tập luôn ra đúng 1 màu cố định (không đổi màu lung tung mỗi khi
+// sắp xếp lại danh sách), nhưng các tập khác nhau sẽ có màu khác nhau cho
+// đỡ đơn điệu. Toàn bộ màu nằm trong 1 bảng ấm hài hòa, không lo bị chỏi.
+const COVER_GRADIENTS = [
+    'linear-gradient(135deg, #e8a94a, #d9713c)',
+    'linear-gradient(135deg, #c2557e, #8b3a5c)',
+    'linear-gradient(135deg, #d9713c, #a8481f)',
+    'linear-gradient(135deg, #e8a94a, #c2557e)',
+    'linear-gradient(135deg, #8b3a5c, #4a2438)'
+];
+
+function getCoverGradient(safeName) {
+    let hash = 0;
+    for (let i = 0; i < safeName.length; i++) {
+        hash = (hash * 31 + safeName.charCodeAt(i)) >>> 0;
+    }
+    return COVER_GRADIENTS[hash % COVER_GRADIENTS.length];
+}
+
+function buildCoverArtHtml(safeName, extraClass = '') {
+    const gradient = getCoverGradient(safeName || '');
+    return `<div class="cover-art ${extraClass}" style="background:${gradient}">
+        <span class="eq-bar-cover"></span><span class="eq-bar-cover"></span><span class="eq-bar-cover"></span><span class="eq-bar-cover"></span><span class="eq-bar-cover"></span>
+    </div>`;
 }
 
 function escapeHtml(str) {
@@ -631,12 +659,12 @@ function playEpisodeByAllIndex(allIndex) {
 
     currentTrackIndex = allIndex;
 
-    document.getElementById('player-cover').src = ep.cover;
+    document.getElementById('player-cover').innerHTML = buildCoverArtHtml(ep.safeName);
     document.getElementById('player-title').textContent = ep.title;
     document.getElementById('player-artist').textContent = 'Khanz094';
     document.getElementById('player-tag').textContent = (ep.tags || []).join(', ');
 
-    document.getElementById('mini-cover').src = ep.cover;
+    document.getElementById('mini-cover').innerHTML = buildCoverArtHtml(ep.safeName, 'mini');
     document.getElementById('mini-title').textContent = ep.title;
     document.getElementById('mini-artist').textContent = 'Khanz094';
 
@@ -904,7 +932,7 @@ function renderHistory() {
         const percent = h.duration ? Math.min(100, (h.position / h.duration) * 100) : 0;
         return `
         <div class="history-card" data-safename="${h.safeName}">
-            <img src="${h.cover}" alt="${escapeHtml(h.title)}" onerror="this.src='https://archive.org/images/notfound.png'">
+            ${buildCoverArtHtml(h.safeName, 'mini')}
             <div class="history-info">
                 <h4>${escapeHtml(h.title)}</h4>
                 <p>${formatTime(h.position)} / ${formatTime(h.duration)}</p>
