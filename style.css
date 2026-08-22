@@ -307,20 +307,23 @@ body {
 
 .filter-active-dot.hidden { display: none; }
 
-/* Panel thả xuống chứa các chip chủ đề — dùng #id để chắc chắn thắng
-   .dropdown-menu về độ ưu tiên CSS bất kể thứ tự trong file. */
+/* Panel thả xuống chứa các chip chủ đề — dùng position:fixed neo theo TOÀN
+   MÀN HÌNH (không neo theo nút phễu) để đảm bảo luôn nằm gọn trong khung
+   nhìn thấy được, không bao giờ tràn ra ngoài dù màn hình hẹp hay nút nằm
+   sát mép nào. Dùng #id để chắc chắn thắng .dropdown-menu về độ ưu tiên. */
 #tag-filter-container {
-    position: absolute;
-    top: calc(100% + 10px);
-    right: 0;
+    position: fixed;
+    top: 72px;
+    left: 16px;
+    right: 16px;
+    max-width: 420px;
+    margin: 0 auto;
     background: var(--card-bg);
     border: 1px solid var(--border-color);
     border-radius: 16px;
     padding: 0.9rem;
     box-shadow: var(--shadow);
-    z-index: 200;
-    width: max(260px, 70vw);
-    max-width: 340px;
+    z-index: 500;
     max-height: 60vh;
     overflow-y: auto;
     display: flex;
